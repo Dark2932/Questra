@@ -1,21 +1,49 @@
-<%- include('../partials/admin-head', { title: '问卷', current: 'surveys', siteName }) %>
+<%- include('../partials/admin-head', { title: '问卷与考试', current: 'surveys', siteName }) %>
   <div class="page-heading">
-    <div><p class="eyebrow">SURVEYS</p><h1>问卷</h1></div>
-    <button class="button primary" type="button" data-open-survey>生成问卷</button>
+    <div><p class="eyebrow">SURVEYS & EXAMS</p><h1>问卷与考试</h1></div>
+    <button class="button primary" type="button" data-open-survey>生成实例</button>
   </div>
 
   <section class="panel">
-    <div class="section-title"><div><h2>问卷实例</h2><p>分享公开链接，管理状态并查看回收数据。</p></div></div>
+    <div class="section-title"><div><h2>实例列表</h2><p>分享公开链接，管理问卷或考试并查看提交数据。</p></div></div>
     <div id="survey-list" class="table-wrap"><p class="loading">正在加载…</p></div>
   </section>
 
   <dialog id="survey-dialog" class="wide-dialog">
     <form id="survey-form" method="dialog">
-      <div class="dialog-head"><h2>生成问卷</h2><button class="icon-button" type="button" data-close aria-label="关闭">×</button></div>
+      <div class="dialog-head"><h2>生成问卷或考试</h2><button class="icon-button" type="button" data-close aria-label="关闭">×</button></div>
+      <label>实例类型
+        <select name="kind"><option value="survey">普通问卷</option><option value="exam">考试 / 答题</option></select>
+      </label>
       <label>问卷标题<input name="title" maxlength="200" required placeholder="例如：活动反馈问卷"></label>
       <label>说明<textarea name="description" rows="3" placeholder="选填，向填写者说明问卷用途"></textarea></label>
       <label>截止时间<input name="expiresAt" type="datetime-local"></label>
       <fieldset><legend>从问题池选择题目</legend><div id="survey-question-options" class="choice-list"><p class="loading">正在加载…</p></div></fieldset>
+      <section id="exam-settings" class="exam-settings" hidden>
+        <fieldset>
+          <legend>计分模式</legend>
+          <div class="segmented-control">
+            <label><input type="radio" name="scoringMode" value="weighted" checked><span>满分与题型权重</span></label>
+            <label><input type="radio" name="scoringMode" value="per_question"><span>逐题分值累加</span></label>
+          </div>
+        </fieldset>
+        <div id="weighted-settings">
+          <label>考试满分<input name="totalScore" type="number" min="0.01" step="0.01" value="100"></label>
+          <fieldset><legend>题型权重（已选题型合计必须为 100%）</legend>
+            <div id="weight-fields" class="score-grid"></div>
+          </fieldset>
+        </div>
+        <div id="per-question-settings" hidden>
+          <fieldset><legend>按题型批量设置单题分值</legend>
+            <div class="batch-score-grid">
+              <label>单选<input type="number" min="0.01" step="0.01" data-batch-value="single" placeholder="分"></label><button type="button" class="button small" data-apply-score="single">应用</button>
+              <label>多选<input type="number" min="0.01" step="0.01" data-batch-value="multiple" placeholder="分"></label><button type="button" class="button small" data-apply-score="multiple">应用</button>
+              <label>文本<input type="number" min="0.01" step="0.01" data-batch-value="text" placeholder="分"></label><button type="button" class="button small" data-apply-score="text">应用</button>
+            </div>
+          </fieldset>
+          <p class="score-summary">当前满分：<strong id="calculated-max-score">0</strong> 分</p>
+        </div>
+      </section>
       <p id="survey-error" class="form-error"></p>
       <div class="dialog-actions"><button class="button" type="button" data-close>取消</button><button class="button primary" type="submit">生成问卷</button></div>
     </form>

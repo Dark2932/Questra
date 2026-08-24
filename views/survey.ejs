@@ -3,11 +3,11 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title><%= survey.title %> · <%= siteName %></title><link rel="stylesheet" href="/static/styles.css"></head>
 <body class="survey-body">
   <main class="survey-shell">
-    <header class="survey-intro"><span class="survey-brand"><%= siteName %></span><h1><%= survey.title %></h1><% if (survey.description) { %><p><%= survey.description %></p><% } %><div class="survey-meta"><span><%= survey.questions.length %> 道题</span><% if (survey.expiresAt) { %><span>截止 <%= new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false }) %></span><% } %></div></header>
-    <form id="public-survey-form" data-survey-id="<%= survey.id %>">
+    <header class="survey-intro"><span class="survey-brand"><%= siteName %> · <%= survey.kind === 'exam' ? '考试' : '问卷' %></span><h1><%= survey.title %></h1><% if (survey.description) { %><p><%= survey.description %></p><% } %><div class="survey-meta"><span><%= survey.questions.length %> 道题</span><% if (survey.kind === 'exam') { %><span>满分 <%= survey.maxScore %> 分</span><% } %><% if (survey.expiresAt) { %><span>截止 <%= new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false }) %></span><% } %></div></header>
+    <form id="public-survey-form" data-survey-id="<%= survey.id %>" data-kind="<%= survey.kind %>">
       <% survey.questions.forEach((question, index) => { %>
         <fieldset class="question-block" data-question-id="<%= question.id %>" data-type="<%= question.type %>">
-          <legend><span class="question-number"><%= String(index + 1).padStart(2, '0') %></span><%= question.title %><% if (question.required) { %><em>必填</em><% } %></legend>
+          <legend><span class="question-number"><%= String(index + 1).padStart(2, '0') %></span><%= question.title %><% if (question.required) { %><em>必填</em><% } %><% if (survey.kind === 'exam') { %><small><%= question.points.toFixed(2).replace(/\.00$/, '') %> 分</small><% } %></legend>
           <% if (question.type === 'text') { %>
             <textarea name="q_<%= question.id %>" rows="4" maxlength="10000" <%= question.required ? 'required' : '' %> placeholder="请输入你的回答"></textarea>
           <% } else { question.options.forEach((option, optionIndex) => { %>
@@ -15,9 +15,9 @@
           <% }) } %>
         </fieldset>
       <% }) %>
-      <p id="submit-error" class="form-error"></p><button class="button primary submit-button" type="submit">提交答卷</button>
+      <p id="submit-error" class="form-error"></p><button class="button primary submit-button" type="submit"><%= survey.kind === 'exam' ? '提交试卷' : '提交答卷' %></button>
     </form>
-    <section id="thank-you" class="thank-you" hidden><span class="success-mark">✓</span><h2>感谢参与</h2><p>你的答卷已成功提交。</p></section>
+    <section id="thank-you" class="thank-you" hidden><span class="success-mark">✓</span><h2 id="result-title">感谢参与</h2><p id="result-message">你的答卷已成功提交。</p><div id="exam-score" class="exam-score" hidden><strong id="score-value">0</strong><span> / <b id="max-score-value">0</b> 分</span></div></section>
   </main>
   <script src="/static/survey.js"></script>
 </body>

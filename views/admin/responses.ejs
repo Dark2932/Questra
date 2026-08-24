@@ -3,9 +3,12 @@
     <div><a class="back-link" href="/admin/surveys">← 返回问卷</a><h1><%= survey.title %></h1><p class="page-subtitle">回收数据</p></div>
     <a class="button" href="/s/<%= survey.id %>" target="_blank" rel="noopener">打开问卷</a>
   </div>
-  <section class="metrics compact" id="response-metrics"><article><span>答卷总数</span><strong>—</strong></article></section>
+  <section class="metrics compact <%= survey.kind === 'exam' ? 'exam-metrics' : '' %>" id="response-metrics" data-kind="<%= survey.kind %>">
+    <article><span><%= survey.kind === 'exam' ? '试卷总数' : '答卷总数' %></span><strong data-response-count>—</strong></article>
+    <% if (survey.kind === 'exam') { %><article><span>平均分</span><strong data-average-score>—</strong></article><% } %>
+  </section>
   <section class="panel">
-    <div class="section-title"><div><h2>答卷明细</h2><p>多选答案使用顿号分隔展示。</p></div></div>
+    <div class="section-title"><div><h2><%= survey.kind === 'exam' ? '成绩明细' : '答卷明细' %></h2><p><%= survey.kind === 'exam' ? `满分 ${survey.maxScore} 分；多选题全对才得分。` : '多选答案使用顿号分隔展示。' %></p></div></div>
     <div id="response-table" class="table-wrap" data-survey-id="<%= survey.id %>"><p class="loading">正在加载…</p></div>
   </section>
 <%- include('../partials/admin-foot') %>

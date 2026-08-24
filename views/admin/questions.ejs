@@ -20,6 +20,14 @@
         </select>
       </label>
       <label id="options-field">选项（每行一个）<textarea name="options" rows="5" placeholder="选项 A&#10;选项 B"></textarea></label>
+      <fieldset id="correct-choice-field" class="answer-field">
+        <legend>标准答案（考试使用）</legend>
+        <div id="correct-choice-options" class="answer-options"><p class="empty-note">请先填写选项。</p></div>
+      </fieldset>
+      <label id="correct-text-field" class="answer-field">可接受的标准答案（每行一个）
+        <textarea name="correctText" rows="4" placeholder="允许配置多个等价答案"></textarea>
+      </label>
+      <p class="field-help">不设置标准答案的题目仍可用于普通问卷，但不能加入考试。</p>
       <label class="check-row"><input type="checkbox" name="required"><span>设为必填题</span></label>
       <p id="question-error" class="form-error"></p>
       <div class="dialog-actions"><button class="button" type="button" data-close>取消</button><button class="button primary" type="submit">保存</button></div>

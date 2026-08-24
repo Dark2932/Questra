@@ -32,11 +32,19 @@ form?.addEventListener('submit', async (event) => {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || '提交失败，请稍后重试');
     form.hidden = true;
-    document.querySelector('#thank-you').hidden = false;
+    const result = document.querySelector('#thank-you');
+    if (data.kind === 'exam') {
+      document.querySelector('#result-title').textContent = '答题完成';
+      document.querySelector('#result-message').textContent = '本次考试成绩';
+      document.querySelector('#score-value').textContent = data.score;
+      document.querySelector('#max-score-value').textContent = data.maxScore;
+      document.querySelector('#exam-score').hidden = false;
+    }
+    result.hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (error) {
     errorNode.textContent = error.message;
     button.disabled = false;
-    button.textContent = '提交答卷';
+    button.textContent = form.dataset.kind === 'exam' ? '提交试卷' : '提交答卷';
   }
 });

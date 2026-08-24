@@ -1,6 +1,6 @@
 # Questra
 
-Questra 是面向个人开发者的轻量级自托管问卷框架。它使用 Node.js、Express、EJS 和 SQLite，无前端构建步骤，适合直接运行在低配个人服务器上。
+Questra 是面向个人开发者的轻量级自托管问卷与考试框架。它使用 Node.js、Express、EJS 和 SQLite，无前端构建步骤，适合直接运行在低配个人服务器上。
 
 ## 快速开始
 
@@ -28,7 +28,8 @@ Questra/
 ├─ bin/
 │  └─ questra.js                 # commander CLI：start / migrate
 ├─ migrations/
-│  └─ 001_initial.sql            # SQLite DDL 与索引
+│  ├─ 001_initial.sql            # 问卷基础 DDL 与索引
+│  └─ 002_exam_scoring.sql       # 标准答案与考试计分字段
 ├─ public/
 │  ├─ admin.js                   # 管理端原生 JS
 │  ├─ survey.js                  # 用户端提交逻辑
@@ -53,10 +54,10 @@ Questra/
 完整可执行 DDL 位于 [`migrations/001_initial.sql`](migrations/001_initial.sql)。
 
 - `question_pool`：公共题目模板，`options_json` 保存选择题选项。
-- `surveys`：问卷实例、状态和可选截止时间。
-- `survey_questions`：问卷生成时的完整题目快照。`pool_question_id` 仅追溯来源，不建立外键，因此题池修改或删除不会波及问卷。
-- `responses`：一次问卷提交。
-- `answers`：逐题答案，多选为 JSON 数组，其他答案为 JSON 字符串。
+- `surveys`：普通问卷或考试实例、状态、截止时间与计分配置。
+- `survey_questions`：实例生成时的题目、标准答案和分值快照。`pool_question_id` 仅追溯来源，不建立外键，因此题池修改或删除不会波及已发布实例。
+- `responses`：一次问卷或考试提交，考试记录总分和满分。
+- `answers`：逐题答案、多选 JSON 数组、正确性和本题得分。
 
 SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个数据库连接，不加载 SPA、ORM 或图表运行库，以控制内存占用。
 
@@ -86,6 +87,41 @@ SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个
 ```json
 {"title":"开发者工具调研","description":"仅用于个人项目规划","questionIds":[1,2,3],"expiresAt":"2026-12-31T16:00:00.000Z"}
 ```
+
+## 考试与计分
+
+问题池中的标准答案是可选字段：没有答案的题目仍可用于普通问卷，但不能加入考试。单选答案为字符串，多选和文本可接受答案为数组：
+
+```json
+{"title":"Node.js 使用哪个 JavaScript 引擎？","type":"single","options":["V8","SpiderMonkey"],"correctAnswer":"V8","required":true}
+```
+
+权重模式按 `满分 × 题型权重 ÷ 该题型题目数` 计算单题分值，考试实际包含的题型权重必须合计 100%：
+
+```json
+{
+  "kind":"exam",
+  "title":"Node.js 基础考试",
+  "questionIds":[1,2,3],
+  "scoringMode":"weighted",
+  "totalScore":100,
+  "typeWeights":{"single":40,"multiple":30,"text":30}
+}
+```
+
+逐题累加模式直接为每道问题池题目指定分值，满分由所有题目分值相加得到。管理页面提供按题型批量填写的快捷项：
+
+```json
+{
+  "kind":"exam",
+  "title":"专项练习",
+  "questionIds":[1,2],
+  "scoringMode":"per_question",
+  "questionScores":{"1":5,"2":15}
+}
+```
+
+自动判分规则：单选完全匹配；多选答案集合完全匹配，不计算部分分；文本忽略首尾空格和大小写后，匹配任一可接受答案。标准答案只在受 Token 保护的管理 API 返回，公开页面和公开 GET API 不包含答案。
 
 提交答卷时，`answers` 的键是问卷题目 `survey_questions.id`，不是问题池 ID：
 

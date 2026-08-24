@@ -29,25 +29,41 @@ function createAdminApi({ db, surveyService }) {
 
   router.get('/questions', (req, res) => {
     const rows = db.prepare('SELECT * FROM question_pool ORDER BY updated_at DESC, id DESC').all();
-    res.json(rows.map(serializeQuestion));
+    res.json(rows.map((row) => serializeQuestion(row, { includeAnswer: true })));
   });
 
   router.post('/questions', (req, res) => {
     const question = surveyService.normalizeQuestion(req.body);
     const result = db.prepare(`
-      INSERT INTO question_pool (title, type, options_json, is_required) VALUES (?, ?, ?, ?)
-    `).run(question.title, question.type, JSON.stringify(question.options), Number(question.required));
-    res.status(201).json(serializeQuestion(db.prepare('SELECT * FROM question_pool WHERE id = ?').get(result.lastInsertRowid)));
+      INSERT INTO question_pool (title, type, options_json, is_required, correct_answer_json) VALUES (?, ?, ?, ?, ?)
+    `).run(
+      question.title,
+      question.type,
+      JSON.stringify(question.options),
+      Number(question.required),
+      question.correctAnswer === null ? null : JSON.stringify(question.correctAnswer)
+    );
+    res.status(201).json(serializeQuestion(
+      db.prepare('SELECT * FROM question_pool WHERE id = ?').get(result.lastInsertRowid),
+      { includeAnswer: true }
+    ));
   });
 
   router.put('/questions/:id', (req, res) => {
     const question = surveyService.normalizeQuestion(req.body);
     const result = db.prepare(`
-      UPDATE question_pool SET title = ?, type = ?, options_json = ?, is_required = ?, updated_at = datetime('now')
+      UPDATE question_pool SET title = ?, type = ?, options_json = ?, is_required = ?, correct_answer_json = ?, updated_at = datetime('now')
       WHERE id = ?
-    `).run(question.title, question.type, JSON.stringify(question.options), Number(question.required), req.params.id);
+    `).run(
+      question.title,
+      question.type,
+      JSON.stringify(question.options),
+      Number(question.required),
+      question.correctAnswer === null ? null : JSON.stringify(question.correctAnswer),
+      req.params.id
+    );
     if (!result.changes) throw new HttpError(404, '题目不存在');
-    res.json(serializeQuestion(db.prepare('SELECT * FROM question_pool WHERE id = ?').get(req.params.id)));
+    res.json(serializeQuestion(db.prepare('SELECT * FROM question_pool WHERE id = ?').get(req.params.id), { includeAnswer: true }));
   });
 
   router.delete('/questions/:id', (req, res) => {
@@ -71,7 +87,7 @@ function createAdminApi({ db, surveyService }) {
   });
 
   router.get('/surveys/:id', (req, res) => {
-    res.json(surveyService.getSurvey(req.params.id));
+    res.json(surveyService.getSurvey(req.params.id, true, true));
   });
 
   router.put('/surveys/:id', (req, res) => {
@@ -88,7 +104,7 @@ function createAdminApi({ db, surveyService }) {
     db.prepare(`
       UPDATE surveys SET title = ?, description = ?, status = ?, expires_at = ?, updated_at = datetime('now') WHERE id = ?
     `).run(title, description, status, expiresAt, req.params.id);
-    res.json(surveyService.getSurvey(req.params.id));
+    res.json(surveyService.getSurvey(req.params.id, true, true));
   });
 
   router.delete('/surveys/:id', (req, res) => {
@@ -98,18 +114,24 @@ function createAdminApi({ db, surveyService }) {
   });
 
   router.get('/surveys/:id/responses', (req, res) => {
-    const survey = surveyService.getSurvey(req.params.id);
+    const survey = surveyService.getSurvey(req.params.id, true, true);
     const responseRows = db.prepare('SELECT * FROM responses WHERE survey_id = ? ORDER BY submitted_at DESC').all(req.params.id);
     const answersByResponse = db.prepare(`
-      SELECT a.survey_question_id, a.value_json
+      SELECT a.survey_question_id, a.value_json, a.is_correct, a.awarded_score
       FROM answers a WHERE a.response_id = ?
     `);
     const responses = responseRows.map((response) => ({
       id: response.id,
       submittedAt: response.submitted_at,
+      score: response.score === null ? null : Number(response.score),
+      maxScore: response.max_score === null ? null : Number(response.max_score),
       answers: Object.fromEntries(answersByResponse.all(response.id).map((answer) => [
         answer.survey_question_id,
-        parseJson(answer.value_json, null)
+        {
+          value: parseJson(answer.value_json, null),
+          isCorrect: answer.is_correct === null ? null : Boolean(answer.is_correct),
+          awardedScore: answer.awarded_score === null ? null : Number(answer.awarded_score)
+        }
       ]))
     }));
     res.json({ survey, responses });
