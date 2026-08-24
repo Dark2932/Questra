@@ -35,17 +35,17 @@ export function ToastProvider({ children }) {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 80, scale: 0.9 }}
               transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="pointer-events-auto flex items-center gap-3 px-4 py-3 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[280px] max-w-sm"
+              className="pointer-events-auto flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 min-w-[280px] max-w-sm"
             >
               {t.type === 'success' ? (
                 <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0" />
               ) : (
                 <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
               )}
-              <p className="text-sm text-gray-700 flex-1 leading-snug">{t.message}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200 flex-1 leading-snug">{t.message}</p>
               <button
                 onClick={() => remove(t.id)}
-                className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               >
                 <X className="w-4 h-4 text-gray-400" />
               </button>
@@ -56,3 +56,4 @@ export function ToastProvider({ children }) {
     </ToastContext.Provider>
   );
 }
+

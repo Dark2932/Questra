@@ -2,49 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  body {
-    font-family: 'Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  ::selection {
-    background: #187a55;
-    color: white;
-  }
+:root {
+  color-scheme: light dark;
 }
 
-@layer components {
-  .inspira-card {
-    @apply relative overflow-hidden rounded-xl border border-gray-200/60 bg-white;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
-  }
+* {
+  box-sizing: border-box;
+}
 
-  .inspira-card-hover {
-    @apply transition-all duration-300;
-  }
+body {
+  margin: 0;
+  font-family: 'Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  .inspira-card-hover:hover {
-    box-shadow: 0 8px 32px rgba(24, 122, 85, 0.1);
-    border-color: rgba(24, 122, 85, 0.25);
-  }
-
-  .gradient-mesh {
-    background:
-      radial-gradient(at 15% 15%, rgba(24, 122, 85, 0.05) 0%, transparent 50%),
-      radial-gradient(at 85% 85%, rgba(74, 222, 128, 0.04) 0%, transparent 50%);
-  }
-
-  .dark-gradient {
-    background: linear-gradient(135deg, #070e1a 0%, #0c1a2e 40%, #091420 100%);
-  }
+::selection {
+  background: #111;
+  color: #fff;
 }
 
 ::-webkit-scrollbar {
@@ -55,9 +30,10 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
 }
+

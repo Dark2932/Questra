@@ -1,56 +1,36 @@
-import Input from '../../components/ui/Input';
+﻿import { Form, InputNumber, Radio, Space, Typography, Row, Col } from 'antd';
 
+const { Text } = Typography;
 const typeLabels = { single: '单选', multiple: '多选', text: '文本' };
 
-export default function ExamSettings({ scoringMode, setScoringMode, typeCounts, qScores, batchScore, maxScore }) {
+export default function ExamSettings({ scoringMode, setScoringMode, typeCounts }) {
   return (
-    <div className="space-y-4 rounded-xl border border-orange-200 bg-orange-50/30 p-4">
-      <h3 className="text-sm font-bold text-orange-700">考试设置</h3>
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="radio" name="scoringMode" value="weighted" checked={scoringMode === 'weighted'}
-            onChange={() => setScoringMode('weighted')} className="accent-[#187a55]" /><span>满分与题型权重</span>
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="radio" name="scoringMode" value="per_question" checked={scoringMode === 'per_question'}
-            onChange={() => setScoringMode('per_question')} className="accent-[#187a55]" /><span>逐题分值累加</span>
-        </label>
-      </div>
+    <div style={{ border: '1px solid var(--ant-color-warning-border, #f5d599)', borderRadius: 8, padding: 16, background: 'var(--ant-color-warning-bg, #fffbe6)' }}>
+      <Text strong style={{ color: 'var(--ant-color-warning-text, #ad6800)', marginBottom: 16, display: 'block' }}>考试设置</Text>
+      <Form.Item name="scoringMode" label="计分模式" initialValue="weighted">
+        <Radio.Group onChange={(e) => setScoringMode(e.target.value)}>
+          <Space direction="vertical">
+            <Radio value="weighted">满分与题型权重</Radio>
+            <Radio value="per_question">逐题分值累加</Radio>
+          </Space>
+        </Radio.Group>
+      </Form.Item>
       {scoringMode === 'weighted' && (
-        <div className="space-y-3">
-          <Input label="考试满分" name="totalScore" type="number" min="0.01" step="0.01" defaultValue="100" />
-          <fieldset className="space-y-2">
-            <legend className="text-xs font-medium text-gray-600">题型权重（合计 100%）</legend>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {Object.keys(typeCounts).map((t) => (
-                <div key={t} className="space-y-1">
-                  <label className="text-xs text-gray-500">{typeLabels[t]}（{typeCounts[t]} 题）</label>
-                  <div className="flex items-center gap-1">
-                    <input name={`w_${t}`} type="number" min="0.01" step="0.01"
-                      className="w-full h-8 px-2 rounded border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent" />
-                    <span className="text-xs text-gray-400">%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </fieldset>
-        </div>
-      )}
-      {scoringMode === 'per_question' && (
-        <div className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
+        <>
+          <Form.Item name="totalScore" label="考试满分" initialValue={100}>
+            <InputNumber min={0.01} step={0.01} style={{ width: '100%' }} />
+          </Form.Item>
+          <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>题型权重（合计 100%）</Text>
+          <Row gutter={[12, 12]}>
             {Object.keys(typeCounts).map((t) => (
-              <div key={t} className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 px-3 py-1.5">
-                <span className="text-xs text-gray-500">{typeLabels[t]}</span>
-                <input type="number" min="0.01" step="0.01" placeholder="分" id={`batch_${t}`}
-                  className="w-16 h-7 px-2 rounded border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent" />
-                <button type="button" className="text-xs text-accent font-medium hover:underline"
-                  onClick={() => batchScore(t, document.getElementById(`batch_${t}`).value)}>应用</button>
-              </div>
+              <Col key={t} xs={24} sm={8}>
+                <Form.Item name={['typeWeights', t]} label={`${typeLabels[t]}（${typeCounts[t]} 题）`} style={{ marginBottom: 0 }}>
+                  <InputNumber min={0.01} step={0.01} addonAfter="%" style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
             ))}
-          </div>
-          <p className="text-sm text-gray-600">当前满分：<strong className="text-gray-900">{maxScore.toFixed(2).replace(/\.00$/, '')}</strong> 分</p>
-        </div>
+          </Row>
+        </>
       )}
     </div>
   );

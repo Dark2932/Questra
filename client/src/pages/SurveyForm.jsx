@@ -1,67 +1,77 @@
-import { useState } from 'react';
-import ShimmerButton from '../components/effects/ShimmerButton';
+﻿import { useState } from 'react';
+import { Button, Input, Radio, Checkbox, Space, Typography, Alert } from 'antd';
+import { SendOutlined } from '@ant-design/icons';
+
+const { TextArea } = Input;
+const { Text, Title } = Typography;
 
 export default function SurveyForm({ survey, onSubmit }) {
+  const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
+  const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitError('');
-    const form = e.target;
-    const answers = {};
+  const setAnswer = (qid, value) => setAnswers((prev) => ({ ...prev, [qid]: value }));
 
-    survey.questions.forEach((q) => {
-      const block = form.querySelector(`[data-qid="${q.id}"]`);
-      if (q.type === 'multiple') {
-        answers[q.id] = [...block.querySelectorAll('input:checked')].map((el) => el.value);
-      } else if (q.type === 'single') {
-        answers[q.id] = block.querySelector('input:checked')?.value || '';
-      } else {
-        answers[q.id] = block.querySelector('textarea')?.value || '';
+  const handleSubmit = async () => {
+    setError('');
+    for (const q of survey.questions) {
+      if (q.required) {
+        const v = answers[q.id];
+        if (v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) {
+          setError(`请完成第 ${survey.questions.indexOf(q) + 1} 题`);
+          return;
+        }
       }
-    });
-
+    }
     setSubmitting(true);
-    try { await onSubmit(answers); }
-    catch (err) { setSubmitError(err.message); }
+    try { await onSubmit(answers); } catch (err) { setError(err.message); }
     finally { setSubmitting(false); }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="px-8 py-6">
+    <div style={{ padding: '0 32px 32px' }}>
       {survey.questions.map((q, idx) => (
-        <div key={q.id} data-qid={q.id} className="py-6 border-b border-white/[0.06] last:border-0">
-          <div className="flex items-start gap-3 mb-4">
-            <span className="text-emerald-400 font-mono text-xs font-bold mt-1">{String(idx + 1).padStart(2, '0')}</span>
-            <p className="font-semibold text-white leading-relaxed">
-              {q.title}
-              {q.required && <span className="text-red-400 text-xs ml-2">必填</span>}
-              {survey.kind === 'exam' && q.points != null && <span className="text-white/40 text-xs ml-2">{q.points.toFixed(2).replace(/\.00$/, '')} 分</span>}
-            </p>
+        <div key={q.id} style={{ padding: '24px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+              {String(idx + 1).padStart(2, '0')}
+            </Text>
+            <div>
+              <Text style={{ color: '#fff', fontWeight: 600, display: 'block' }}>{q.title}
+                {q.required && <Text type="danger" style={{ fontSize: 12, marginLeft: 8 }}>必填</Text>}
+                {survey.kind === 'exam' && q.points != null && <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginLeft: 8 }}>{q.points.toFixed(2).replace(/\.00$/, '')} 分</Text>}
+              </Text>
+            </div>
           </div>
           {q.type === 'text' ? (
-            <textarea rows={3} maxLength={10000} placeholder="请输入你的回答" required={q.required}
-              className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder:text-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400/40 transition-all resize-none ml-6" />
+            <TextArea rows={3} maxLength={10000} placeholder="请输入你的回答" value={answers[q.id] || ''}
+              onChange={(e) => setAnswer(q.id, e.target.value)} style={{ marginLeft: 24, background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }} />
+          ) : q.type === 'single' ? (
+            <Radio.Group value={answers[q.id]} onChange={(e) => setAnswer(q.id, e.target.value)} style={{ marginLeft: 24 }}>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                {q.options.map((opt) => (
+                  <Radio key={opt} value={opt} style={{ color: 'rgba(255,255,255,0.8)', padding: '10px 16px', borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.1)', width: '100%', marginInlineStart: 0 }}>{opt}</Radio>
+                ))}
+              </Space>
+            </Radio.Group>
           ) : (
-            <div className="space-y-2 ml-6">
-              {q.options.map((opt) => (
-                <label key={opt} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 hover:border-emerald-400/30 hover:bg-emerald-400/[0.06] cursor-pointer transition-all group">
-                  <input type={q.type === 'single' ? 'radio' : 'checkbox'} name={`q_${q.id}`} value={opt}
-                    required={q.required && q.type === 'single'} className="accent-emerald-400 w-4 h-4" />
-                  <span className="text-white/80 text-sm group-hover:text-white transition-colors">{opt}</span>
-                </label>
-              ))}
-            </div>
+            <Checkbox.Group value={answers[q.id] || []} onChange={(v) => setAnswer(q.id, v)} style={{ marginLeft: 24 }}>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                {q.options.map((opt) => (
+                  <Checkbox key={opt} value={opt} style={{ color: 'rgba(255,255,255,0.8)', padding: '10px 16px', borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.1)', width: '100%', marginInlineStart: 0 }}>{opt}</Checkbox>
+                ))}
+              </Space>
+            </Checkbox.Group>
           )}
         </div>
       ))}
-      {submitError && <p className="text-red-400 text-sm bg-red-400/10 rounded-lg px-4 py-2 mt-2">{submitError}</p>}
-      <div className="pt-5">
-        <ShimmerButton type="submit" disabled={submitting} className="w-full">
-          {submitting ? '正在提交…' : survey.kind === 'exam' ? '提交试卷' : '提交答卷'}
-        </ShimmerButton>
-      </div>
-    </form>
+      {error && <Alert message={error} type="error" showIcon style={{ marginTop: 16 }} />}
+      <Button type="primary" icon={<SendOutlined />} size="large" block loading={submitting}
+        onClick={handleSubmit} style={{ marginTop: 20 }}>
+        {submitting ? '正在提交...' : survey.kind === 'exam' ? '提交试卷' : '提交答卷'}
+      </Button>
+    </div>
   );
 }

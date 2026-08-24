@@ -1,102 +1,79 @@
-import { useState, useEffect } from 'react';
-import Dialog from '../../components/ui/Dialog';
-import Input from '../../components/ui/Input';
-import Select from '../../components/ui/Select';
-import Button from '../../components/ui/Button';
+﻿import { useEffect, useState } from 'react';
+import { Modal, Form, Input, Select, Checkbox, Radio, Space, Typography } from 'antd';
 
-export default function QuestionDialog({ open, onClose, editing, onSubmit, error, onErrorClear }) {
-  const [type, setType] = useState('single');
-  const [optionsText, setOptionsText] = useState('');
+const { TextArea } = Input;
+
+export default function QuestionDialog({ open, onClose, editing, onSuccess }) {
+  const [form] = Form.useForm();
+  const type = Form.useWatch('type', form);
 
   useEffect(() => {
-    if (open) {
-      setType(editing?.type || 'single');
-      setOptionsText(editing?.options?.join('\n') || '');
-      onErrorClear?.();
+    if (!open) return;
+    if (editing) {
+      form.setFieldsValue({
+        title: editing.title,
+        type: editing.type,
+        options: editing.options?.join('\n') || '',
+        required: editing.required,
+        correctSingle: editing.correctAnswer,
+        correctMultiple: Array.isArray(editing.correctAnswer) ? editing.correctAnswer : [],
+        correctText: Array.isArray(editing.correctAnswer) ? editing.correctAnswer.join('\n') : editing.correctAnswer || '',
+      });
+    } else {
+      form.resetFields();
+      form.setFieldsValue({ type: 'single', required: true });
     }
-  }, [open, editing, onErrorClear]);
+  }, [open, editing, form]);
 
-  const options = optionsText.split('\n').map((s) => s.trim()).filter(Boolean);
+  const handleOk = async () => {
+    const values = await form.validateFields();
+    const options = values.type === 'text' ? [] : (values.options || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    let correctAnswer = null;
+    if (values.type === 'single' && values.correctSingle) correctAnswer = values.correctSingle;
+    else if (values.type === 'multiple' && values.correctMultiple?.length) correctAnswer = values.correctMultiple;
+    else if (values.type === 'text' && values.correctText?.trim()) correctAnswer = values.correctText.split('\n').map((s) => s.trim()).filter(Boolean);
+    onSuccess({ title: values.title.trim(), type: values.type, options, required: !!values.required, correctAnswer: correctAnswer || null });
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} title={editing ? '编辑题目' : '添加题目'}>
-      <form onSubmit={onSubmit} className="space-y-4">
-        <input type="hidden" name="id" defaultValue={editing?.id || ''} />
-        <Input label="题目标题" name="title" required maxLength={500}
-          placeholder="请输入题目内容" defaultValue={editing?.title || ''} />
-
-        <Select label="题目类型" name="type" value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="single">单选</option>
-          <option value="multiple">多选</option>
-          <option value="text">填空 / 开放文本</option>
-        </Select>
-
+    <Modal open={open} title={editing ? '编辑题目' : '添加题目'} onCancel={onClose} onOk={handleOk}
+      okText="保存" cancelText="取消" destroyOnHidden width={520}>
+      <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+        <Form.Item name="title" label="题目标题" rules={[{ required: true, message: '请输入题目标题' }]}>
+          <Input maxLength={500} placeholder="请输入题目内容" />
+        </Form.Item>
+        <Form.Item name="type" label="题目类型">
+          <Select options={[{ value: 'single', label: '单选' }, { value: 'multiple', label: '多选' }, { value: 'text', label: '填空 / 开放文本' }]} />
+        </Form.Item>
         {type !== 'text' && (
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700">选项（每行一个）</label>
-            <textarea name="options" rows={4} value={optionsText}
-              onChange={(e) => setOptionsText(e.target.value)}
-              placeholder={'选项 A\n选项 B'}
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all resize-none" />
-          </div>
+          <Form.Item name="options" label="选项（每行一个）" rules={[{ required: true, message: '请输入至少两个选项' }]}>
+            <TextArea rows={4} placeholder={'选项 A\n选项 B'} />
+          </Form.Item>
         )}
-
-        {type === 'single' && options.length > 0 && (
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-gray-700">标准答案（考试使用）</legend>
-            <div className="space-y-1.5 pl-1">
-              {options.map((opt) => (
-                <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="radio" name="correctSingle" value={opt}
-                    defaultChecked={editing?.correctAnswer === opt} className="accent-[#187a55] w-4 h-4" />
-                  <span>{opt}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+        {type === 'single' && (
+          <Form.Item name="correctSingle" label="标准答案（考试使用）">
+            <Radio.Group>
+              <Space direction="vertical">
+                {(form.getFieldValue('options') || '').split('\n').filter(Boolean).map((o) => <Radio key={o} value={o.trim()}>{o.trim()}</Radio>)}
+              </Space>
+            </Radio.Group>
+          </Form.Item>
         )}
-
-        {type === 'multiple' && options.length > 0 && (
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-gray-700">标准答案（考试使用）</legend>
-            <div className="space-y-1.5 pl-1">
-              {options.map((opt) => (
-                <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" name="correctMultiple" value={opt}
-                    defaultChecked={Array.isArray(editing?.correctAnswer) && editing.correctAnswer.includes(opt)}
-                    className="accent-[#187a55] w-4 h-4 rounded" />
-                  <span>{opt}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+        {type === 'multiple' && (
+          <Form.Item name="correctMultiple" label="标准答案（考试使用）">
+            <Checkbox.Group options={(form.getFieldValue('options') || '').split('\n').filter(Boolean).map((o) => o.trim())} />
+          </Form.Item>
         )}
-
         {type === 'text' && (
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700">可接受的标准答案（每行一个）</label>
-            <textarea name="correctText" rows={3}
-              defaultValue={Array.isArray(editing?.correctAnswer) ? editing.correctAnswer.join('\n') : editing?.correctAnswer || ''}
-              placeholder="允许配置多个等价答案"
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all resize-none" />
-          </div>
+          <Form.Item name="correctText" label="可接受的标准答案（每行一个）">
+            <TextArea rows={3} placeholder="允许配置多个等价答案" />
+          </Form.Item>
         )}
-
-        <p className="text-xs text-gray-400">不设置标准答案的题目仍可用于普通问卷，但不能加入考试。</p>
-
-        <label className="flex items-center gap-2.5 cursor-pointer">
-          <input type="checkbox" name="required" defaultChecked={editing?.required ?? true}
-            className="accent-[#187a55] w-4 h-4 rounded" />
-          <span className="text-sm text-gray-700">设为必填题</span>
-        </label>
-
-        {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-        <div className="flex justify-end gap-3 pt-3 border-t border-gray-100 -mb-1">
-          <Button type="button" onClick={onClose}>取消</Button>
-          <Button type="submit" variant="primary">保存</Button>
-        </div>
-      </form>
-    </Dialog>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>不设置标准答案的题目仍可用于普通问卷，但不能加入考试。</Typography.Text>
+        <Form.Item name="required" valuePropName="checked" style={{ marginTop: 12 }}>
+          <Checkbox>设为必填题</Checkbox>
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 }

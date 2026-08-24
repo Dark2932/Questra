@@ -1,93 +1,82 @@
-import { useState, useEffect, useMemo } from 'react';
-import Dialog from '../../components/ui/Dialog';
-import Input from '../../components/ui/Input';
-import Select from '../../components/ui/Select';
-import Button from '../../components/ui/Button';
+﻿import { useState, useEffect, useMemo } from 'react';
+import { Modal, Form, Input, Select, DatePicker, Checkbox, Typography, Space, App } from 'antd';
 import ExamSettings from './ExamSettings';
 
+const { TextArea } = Input;
+const { Text } = Typography;
 const typeLabels = { single: '单选', multiple: '多选', text: '文本' };
 
-export default function SurveyDialog({ open, onClose, questions, onSubmit, error, onErrorClear }) {
+export default function SurveyDialog({ open, onClose, questions, onSubmit }) {
+  const [form] = Form.useForm();
   const [kind, setKind] = useState('survey');
-  const [selected, setSelected] = useState(new Set());
+  const [selected, setSelected] = useState([]);
   const [scoringMode, setScoringMode] = useState('weighted');
-  const [qScores, setQScores] = useState({});
+  const { message } = App.useApp();
 
   useEffect(() => {
-    if (open) { setSelected(new Set()); setKind('survey'); setScoringMode('weighted'); setQScores({}); onErrorClear?.(); }
-  }, [open, onErrorClear]);
+    if (open) { form.resetFields(); setSelected([]); setKind('survey'); setScoringMode('weighted'); }
+  }, [open, form]);
 
-  const toggle = (id) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const selQs = useMemo(() => questions.filter((q) => selected.has(q.id)), [questions, selected]);
+  const selQs = useMemo(() => questions.filter((q) => selected.includes(q.id)), [questions, selected]);
   const typeCounts = useMemo(() => { const c = {}; selQs.forEach((q) => { c[q.type] = (c[q.type] || 0) + 1; }); return c; }, [selQs]);
 
-  const batchScore = (type, val) => {
-    const v = parseFloat(val); if (!v || v <= 0) return;
-    const n = { ...qScores }; selQs.filter((q) => q.type === type).forEach((q) => { n[q.id] = v; }); setQScores(n);
-  };
-
-  const maxScore = scoringMode === 'per_question'
-    ? selQs.reduce((s, q) => s + (parseFloat(qScores[q.id]) || 0), 0)
-    : 0;
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const payload = {
-      kind, title: fd.get('title').trim(), description: fd.get('description').trim(),
-      expiresAt: fd.get('expiresAt') ? new Date(fd.get('expiresAt')).toISOString() : null,
-      questionIds: [...selected],
-    };
-    if (kind === 'exam') {
-      payload.scoringMode = scoringMode;
-      if (scoringMode === 'weighted') {
-        payload.totalScore = parseFloat(fd.get('totalScore')) || 100;
-        const tw = {}; Object.keys(typeCounts).forEach((t) => { tw[t] = parseFloat(fd.get(`w_${t}`)) || 0; });
-        payload.typeWeights = tw;
-      } else {
-        payload.questionScores = {}; selQs.forEach((q) => { payload.questionScores[q.id] = parseFloat(qScores[q.id]) || 0; });
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      if (!selected.length) { message.warning('请至少选择一道题目'); return; }
+      const payload = {
+        kind,
+        title: values.title.trim(),
+        description: (values.description || '').trim(),
+        expiresAt: values.expiresAt ? values.expiresAt.toISOString() : null,
+        questionIds: selected,
+      };
+      if (kind === 'exam') {
+        payload.scoringMode = scoringMode;
+        if (scoringMode === 'weighted') {
+          payload.totalScore = values.totalScore || 100;
+          payload.typeWeights = values.typeWeights || {};
+        } else {
+          const qs = {}; selQs.forEach((q) => { qs[q.id] = values.questionScores?.[q.id] || 1; }); payload.questionScores = qs;
+        }
       }
-    }
-    onSubmit(payload);
+      onSubmit(payload);
+    } catch (e) { /* validation error */ }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} title="生成问卷或考试" wide>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Select label="实例类型" value={kind} onChange={(e) => setKind(e.target.value)}>
-          <option value="survey">普通问卷</option><option value="exam">考试 / 答题</option>
-        </Select>
-        <Input label="问卷标题" name="title" required maxLength={200} placeholder="例如：活动反馈问卷" />
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-gray-700">说明</label>
-          <textarea name="description" rows={2} placeholder="选填"
-            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all resize-none" />
-        </div>
-        <Input label="截止时间" name="expiresAt" type="datetime-local" />
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium text-gray-700">从问题池选择题目</legend>
-          {questions.length === 0 ? <p className="text-sm text-gray-400 py-2">问题池为空。</p> : (
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+    <Modal open={open} title="生成问卷或考试" onCancel={onClose} onOk={handleOk}
+      okText="生成问卷" cancelText="取消" destroyOnHidden width={600}>
+      <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+        <Form.Item name="kind" label="实例类型" initialValue="survey">
+          <Select onChange={setKind} options={[{ value: 'survey', label: '普通问卷' }, { value: 'exam', label: '考试 / 答题' }]} />
+        </Form.Item>
+        <Form.Item name="title" label="问卷标题" rules={[{ required: true, message: '请输入问卷标题' }]}>
+          <Input maxLength={200} placeholder="例如：活动反馈问卷" />
+        </Form.Item>
+        <Form.Item name="description" label="说明">
+          <TextArea rows={2} placeholder="选填，向填写者说明问卷用途" />
+        </Form.Item>
+        <Form.Item name="expiresAt" label="截止时间"><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+        <Form.Item label="从问题池选择题目">
+          {questions.length === 0 ? <Text type="secondary">问题池为空。</Text> : (
+            <div style={{ maxHeight: 192, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {questions.map((q) => (
-                <label key={q.id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${selected.has(q.id) ? 'border-accent/40 bg-accent/[0.04]' : 'border-gray-100 hover:border-gray-200'}`}>
-                  <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggle(q.id)} className="accent-[#187a55] w-4 h-4 rounded mt-0.5" />
-                  <div className="min-w-0"><p className="font-semibold text-gray-900 text-sm">{q.title}</p>
-                    <span className="text-xs text-gray-400">{typeLabels[q.type]} · {q.required ? '必填' : '选填'}</span></div>
+                <label key={q.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', borderRadius: 8,
+                  border: selected.includes(q.id) ? '1px solid var(--ant-color-primary)' : '1px solid var(--ant-color-border-secondary)',
+                  background: selected.includes(q.id) ? 'var(--ant-color-primary-bg)' : undefined, cursor: 'pointer' }}>
+                  <Checkbox checked={selected.includes(q.id)}
+                    onChange={(e) => setSelected((prev) => e.target.checked ? [...prev, q.id] : prev.filter((id) => id !== q.id))} />
+                  <div><div style={{ fontWeight: 600, fontSize: 13 }}>{q.title}</div><Text type="secondary" style={{ fontSize: 12 }}>{typeLabels[q.type]} · {q.required ? '必填' : '选填'}</Text></div>
                 </label>
               ))}
             </div>
           )}
-        </fieldset>
+        </Form.Item>
         {kind === 'exam' && selQs.length > 0 && (
-          <ExamSettings scoringMode={scoringMode} setScoringMode={setScoringMode}
-            typeCounts={typeCounts} qScores={qScores} batchScore={batchScore} maxScore={maxScore} />
+          <ExamSettings scoringMode={scoringMode} setScoringMode={setScoringMode} typeCounts={typeCounts} />
         )}
-        {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-        <div className="flex justify-end gap-3 pt-3 border-t border-gray-100 -mb-1">
-          <Button type="button" onClick={onClose}>取消</Button>
-          <Button type="submit" variant="primary" disabled={selected.size === 0}>生成问卷</Button>
-        </div>
-      </form>
-    </Dialog>
+      </Form>
+    </Modal>
   );
 }

@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, FileQuestion } from 'lucide-react';
+import { Typography, Result, Spin, Statistic } from 'antd';
+import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import Meteors from '../components/effects/Meteors';
 import GridPattern from '../components/effects/GridPattern';
-import GradientText from '../components/effects/GradientText';
-import ShimmerButton from '../components/effects/ShimmerButton';
 import SurveyForm from './SurveyForm';
+
+const { Text, Title } = Typography;
 
 export default function Survey() {
   const { id } = useParams();
@@ -28,52 +28,43 @@ export default function Survey() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  if (loading) return <div className="dark-gradient min-h-screen flex items-center justify-center"><div className="text-white/60 animate-pulse">正在加载…</div></div>;
-  if (error) return (
-    <div className="dark-gradient min-h-screen flex items-center justify-center p-6">
-      <div className="text-center max-w-md"><div className="text-6xl mb-4">⚠️</div><h1 className="text-2xl font-bold text-white mb-2">无法加载问卷</h1><p className="text-white/60">{error}</p></div>
-    </div>
-  );
+  if (loading) return (<div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #070e1a, #0c1a2e, #091420)', display: 'grid', placeItems: 'center' }}><Spin size="large" /></div>);
+  if (error) return (<div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #070e1a, #0c1a2e, #091420)', display: 'grid', placeItems: 'center', padding: 24 }}><Result status="warning" title="无法加载问卷" subTitle={error} style={{ color: '#fff' }} /></div>);
 
   return (
-    <div className="dark-gradient min-h-screen relative overflow-hidden">
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #070e1a, #0c1a2e, #091420)', position: 'relative', overflow: 'hidden' }}>
       <Meteors number={25} /><GridPattern />
-      <div className="relative z-10 max-w-2xl mx-auto px-6 py-12 sm:py-20">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-          className="rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-xl overflow-hidden">
+      <div style={{ position: 'relative', zIndex: 10, maxWidth: 640, margin: '0 auto', padding: '48px 24px' }}>
+        <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)', overflow: 'hidden' }}>
           {!submitted ? (
             <>
-              <header className="px-8 pt-8 pb-6 border-b border-white/10">
-                <p className="text-emerald-400/80 text-xs font-bold tracking-widest uppercase mb-3">
+              <header style={{ padding: '32px 32px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <Text style={{ color: 'rgba(16,185,129,0.8)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12, display: 'block' }}>
                   {survey.siteName || 'Questra'} · {survey.kind === 'exam' ? '考试' : '问卷'}
-                </p>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">{survey.title}</h1>
-                {survey.description && <p className="text-white/50 mt-3 leading-relaxed whitespace-pre-wrap">{survey.description}</p>}
-                <div className="flex items-center gap-5 mt-4 text-white/40 text-xs flex-wrap">
-                  <span className="flex items-center gap-1.5"><FileQuestion className="w-3.5 h-3.5" /> {survey.questions.length} 道题</span>
+                </Text>
+                <Title level={2} style={{ color: '#fff', marginTop: 0, marginBottom: 8 }}>{survey.title}</Title>
+                {survey.description && <Text style={{ color: 'rgba(255,255,255,0.5)', whiteSpace: 'pre-wrap' }}>{survey.description}</Text>}
+                <div style={{ display: 'flex', gap: 20, marginTop: 16, color: 'rgba(255,255,255,0.4)', fontSize: 12, flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><FileTextOutlined /> {survey.questions.length} 道题</span>
                   {survey.kind === 'exam' && <span>满分 {survey.maxScore} 分</span>}
-                  {survey.expiresAt && <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> 截止 {new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false })}</span>}
+                  {survey.expiresAt && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ClockCircleOutlined /> 截止 {new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false })}</span>}
                 </div>
               </header>
               <SurveyForm survey={survey} onSubmit={handleSubmit} />
             </>
           ) : (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}
-              className="px-8 py-16 text-center">
-              <div className="w-16 h-16 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-5">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-              </div>
-              <GradientText className="text-3xl font-bold">{survey.kind === 'exam' ? '试卷已提交' : '感谢参与'}</GradientText>
-              <p className="text-white/50 mt-3">{examResult ? `你的得分：${examResult.score} / ${examResult.maxScore} 分` : '你的答卷已成功提交。'}</p>
+            <div style={{ padding: '64px 32px', textAlign: 'center' }}>
+              <CheckCircleOutlined style={{ fontSize: 48, color: '#10b981', marginBottom: 16 }} />
+              <Title level={3} style={{ color: '#fff', marginTop: 0 }}>{survey.kind === 'exam' ? '试卷已提交' : '感谢参与'}</Title>
+              <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{examResult ? `你的得分：${examResult.score} / ${examResult.maxScore} 分` : '你的答卷已成功提交。'}</Text>
               {examResult && (
-                <div className="mt-6 inline-flex items-baseline gap-2 bg-white/[0.06] rounded-xl px-8 py-4 border border-white/10">
-                  <span className="text-4xl font-bold text-emerald-400">{examResult.score}</span>
-                  <span className="text-white/40 text-lg">/ {examResult.maxScore} 分</span>
+                <div style={{ marginTop: 24, display: 'inline-flex', alignItems: 'baseline', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 32px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <Statistic value={examResult.score} valueStyle={{ color: '#10b981', fontSize: 36, fontWeight: 700 }} suffix={<Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18 }}>/ {examResult.maxScore} 分</Text>} />
                 </div>
               )}
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
       </div>
     </div>
   );

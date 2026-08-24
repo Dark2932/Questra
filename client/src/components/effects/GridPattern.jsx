@@ -9,7 +9,8 @@ export default function GridPattern({ className = '' }) {
             'linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)',
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-accent/[0.04] to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-accent/[0.04] dark:via-accent/[0.08] to-transparent" />
     </div>
   );
 }
+
