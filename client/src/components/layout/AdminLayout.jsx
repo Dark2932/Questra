@@ -48,7 +48,8 @@ export default function AdminLayout({ token, onLogout, theme, onThemeChange }) {
           paddingInline: 24,
           height: 56,
           lineHeight: '56px',
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          background: 'var(--ant-color-bg-container)',
+          borderBottom: '1px solid var(--ant-color-border-secondary)',
         }}
       >
         <Space size={16} align="center">
@@ -64,6 +65,7 @@ export default function AdminLayout({ token, onLogout, theme, onThemeChange }) {
                 placeItems: 'center',
                 fontWeight: 800,
                 fontSize: 13,
+                flexShrink: 0,
               }}
             >
               Q
@@ -80,7 +82,7 @@ export default function AdminLayout({ token, onLogout, theme, onThemeChange }) {
               { key: '/admin/questions', icon: <FormOutlined />, label: <Link to="/admin/questions">问题池</Link> },
               { key: '/admin/surveys', icon: <UnorderedListOutlined />, label: <Link to="/admin/surveys">问卷 / 考试</Link> },
             ]}
-            style={{ minWidth: 0, border: 'none', background: 'transparent' }}
+            style={{ minWidth: 0, border: 'none', background: 'transparent', color: 'var(--ant-color-text)' }}
           />
         </Space>
 
