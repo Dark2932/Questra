@@ -13,7 +13,7 @@ import { api } from '../../api';
 
 const { Header, Content } = Layout;
 
-export default function AdminLayout({ token, onLogout, theme, onThemeChange }) {
+export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onThemeChange }) {
   const navigate = useNavigate();
   const verified = useRef(false);
 
@@ -46,10 +46,14 @@ export default function AdminLayout({ token, onLogout, theme, onThemeChange }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingInline: 24,
-          height: 56,
-          lineHeight: '56px',
-          background: 'var(--ant-color-bg-container)',
-          borderBottom: '1px solid var(--ant-color-border-secondary)',
+          height: 52,
+          lineHeight: '52px',
+          background: resolvedTheme === 'dark'
+            ? 'rgba(28, 28, 30, 0.72)'
+            : 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          borderBottom: `0.5px solid ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
         }}
       >
         <Space size={16} align="center">
@@ -59,7 +63,9 @@ export default function AdminLayout({ token, onLogout, theme, onThemeChange }) {
                 width: 28,
                 height: 28,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #1f6f4a, #3b8b6a)',
+                background: resolvedTheme === 'dark'
+                  ? 'linear-gradient(135deg, #30B0A0, #1a8a7a)'
+                  : 'linear-gradient(135deg, #0D9488, #0f766e)',
                 color: '#fff',
                 display: 'grid',
                 placeItems: 'center',

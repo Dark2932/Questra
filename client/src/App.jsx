@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useState, useCallback, useMemo } from 'react';
 import { ConfigProvider, App as AntApp, theme as antTheme } from 'antd';
+import { AnimatePresence, motion } from 'framer-motion';
 import zhCN from 'antd/locale/zh_CN';
 import { useTheme } from './hooks/useTheme';
 import AdminLayout from './components/layout/AdminLayout';
@@ -25,6 +26,39 @@ function useAdminToken() {
   return [token, setToken];
 }
 
+function Page({ children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function AnimatedRoutes({ token, handleLogout, theme, resolvedTheme, setTheme }) {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/admin" element={<AdminLayout token={token} onLogout={handleLogout} theme={theme} resolvedTheme={resolvedTheme} onThemeChange={setTheme} />}>
+          <Route index element={<Page><Dashboard /></Page>} />
+          <Route path="questions" element={<Page><Questions /></Page>} />
+          <Route path="surveys" element={<Page><Surveys /></Page>} />
+          <Route path="surveys/:id/responses" element={<Page><Responses /></Page>} />
+        </Route>
+        <Route path="/s/:id" element={<Page><Survey /></Page>} />
+        <Route path="/unauthorized" element={<Page><Unauthorized /></Page>} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useAdminToken();
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -38,20 +72,24 @@ export default function App() {
   const themeConfig = useMemo(() => ({
     algorithm,
     token: {
-      colorPrimary: '#1f6f4a',
-      colorSuccess: '#2f9e5f',
-      colorInfo: '#4b6a82',
-      colorWarning: '#b8860b',
-      colorError: '#c0392b',
-      colorTextBase: resolvedTheme === 'dark' ? '#e8e8e8' : '#1f2937',
-      colorBgBase: resolvedTheme === 'dark' ? '#10131a' : '#ffffff',
-      borderRadius: 8,
-      fontFamily: 'Inter, "Segoe UI", "Microsoft YaHei", sans-serif',
-      colorBgLayout: resolvedTheme === 'dark' ? '#0e1218' : '#f7f8fa',
-      colorBgContainer: resolvedTheme === 'dark' ? '#151a23' : '#ffffff',
-      colorBorderSecondary: resolvedTheme === 'dark' ? '#1f2733' : '#f0f0f0',
-      controlHeight: 38,
-      colorLink: '#1f6f4a',
+      colorPrimary: resolvedTheme === 'dark' ? '#30B0A0' : '#0D9488',
+      colorSuccess: '#32D74B',
+      colorInfo: '#64748b',
+      colorWarning: '#FF9F0A',
+      colorError: '#FF453A',
+      colorTextBase: resolvedTheme === 'dark' ? '#f5f5f7' : '#1d1d1f',
+      colorBgBase: resolvedTheme === 'dark' ? '#000000' : '#ffffff',
+      borderRadius: resolvedTheme === 'dark' ? 10 : 6,
+      fontFamily: 'Inter, "SF Pro Display", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
+      colorBgLayout: resolvedTheme === 'dark' ? '#000000' : '#f5f5f7',
+      colorBgContainer: resolvedTheme === 'dark' ? '#1c1c1e' : '#ffffff',
+      colorBorderSecondary: resolvedTheme === 'dark' ? '#38383a' : '#e5e5ea',
+      controlHeight: 36,
+      colorLink: resolvedTheme === 'dark' ? '#30B0A0' : '#0D9488',
+      fontSize: 14,
+      colorBgElevated: resolvedTheme === 'dark' ? '#2c2c2e' : '#ffffff',
+      colorTextSecondary: resolvedTheme === 'dark' ? '#98989d' : '#6e6e73',
+      colorTextTertiary: resolvedTheme === 'dark' ? '#636366' : '#aeaeb2',
     },
   }), [resolvedTheme, algorithm]);
 
@@ -59,17 +97,7 @@ export default function App() {
     <ConfigProvider theme={themeConfig} locale={zhCN}>
       <AntApp>
         <BrowserRouter>
-          <Routes>
-            <Route path="/admin" element={<AdminLayout token={token} onLogout={handleLogout} theme={theme} onThemeChange={setTheme} />}>
-              <Route index element={<Dashboard />} />
-              <Route path="questions" element={<Questions />} />
-              <Route path="surveys" element={<Surveys />} />
-              <Route path="surveys/:id/responses" element={<Responses />} />
-            </Route>
-            <Route path="/s/:id" element={<Survey />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            <Route path="*" element={<Navigate to="/admin" replace />} />
-          </Routes>
+          <AnimatedRoutes token={token} handleLogout={handleLogout} theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} />
         </BrowserRouter>
       </AntApp>
     </ConfigProvider>
