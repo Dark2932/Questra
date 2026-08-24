@@ -6,12 +6,6 @@ const { asyncRoute } = require('../lib/http');
 function createPublicRoutes({ db, config, surveyService }) {
   const router = express.Router();
 
-  router.get('/s/:id', (req, res) => {
-    const survey = surveyService.getSurvey(req.params.id);
-    surveyService.ensureSurveyOpen(survey);
-    res.render('survey', { survey, siteName: config.siteName });
-  });
-
   router.get('/api/surveys/:id', (req, res) => {
     const survey = surveyService.getSurvey(req.params.id);
     surveyService.ensureSurveyOpen(survey);

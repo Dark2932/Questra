@@ -24,7 +24,12 @@ function createAdminApi({ db, surveyService }) {
       FROM days LEFT JOIN responses ON date(responses.submitted_at) = days.day
       GROUP BY days.day ORDER BY days.day
     `).all();
-    res.json({ totals, trend });
+    const recentSurveys = db.prepare(`
+      SELECT s.*, (SELECT COUNT(*) FROM responses r WHERE r.survey_id = s.id) AS response_count,
+        (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id) AS question_count
+      FROM surveys s ORDER BY s.created_at DESC LIMIT 5
+    `).all();
+    res.json({ totals, trend, recentSurveys });
   });
 
   router.get('/questions', (req, res) => {

@@ -3,4 +3,6 @@ data/
 .env
 *.log
 coverage/
+client/node_modules/
+client/dist/
 
