@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, Link } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
-import { Layout, Menu, Space, Typography, Segmented, Button } from 'antd';
+import { Layout, Menu, Space, Typography, Segmented } from 'antd';
 import {
   DashboardOutlined,
   FormOutlined,

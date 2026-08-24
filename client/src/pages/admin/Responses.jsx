@@ -1,25 +1,52 @@
 ﻿import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Card, Table, Statistic, Button, Typography, Space, Row, Col, Tag, Empty } from 'antd';
-import { ArrowLeftOutlined, ExportOutlined } from '@ant-design/icons';
+import { Card, Table, Statistic, Button, Typography, Space, Row, Col, Empty, App } from 'antd';
+import { ArrowLeftOutlined, ExportOutlined, FileExcelOutlined, CloudDownloadOutlined } from '@ant-design/icons';
+import { formatAnswer } from '../../lib/format';
 import { api } from '../../api';
 
 const { Title, Text } = Typography;
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export default function Responses() {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const { message } = App.useApp();
 
   useEffect(() => {
     api.getSurveyResponses(id).then(setData).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
 
+  const handleExport = async (format) => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const blob = await api.exportSurveyResponses(id, format);
+      downloadBlob(blob, `survey-${id}.${format}`);
+      message.success('导出成功');
+    } catch (e) {
+      message.error(e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) return <Card loading />;
   if (!data) return <Card><Empty description="加载失败" /></Card>;
 
   const { survey, responses } = data;
-  const display = (v) => (Array.isArray(v) ? v.join('\u3001') : v || '\u2014');
   const avgScore = responses.length ? (responses.reduce((s, r) => s + (r.score || 0), 0) / responses.length).toFixed(1) : '0';
 
   return (
@@ -32,9 +59,13 @@ export default function Responses() {
           <Title level={3} style={{ marginTop: 0, marginBottom: 4 }}>{survey.title}</Title>
           <Text type="secondary">回收数据</Text>
         </div>
-        <a href={`/s/${survey.id}`} target="_blank" rel="noopener noreferrer">
-          <Button icon={<ExportOutlined />}>打开问卷</Button>
-        </a>
+        <Space wrap>
+          <a href={`/s/${survey.id}`} target="_blank" rel="noopener noreferrer">
+            <Button icon={<ExportOutlined />}>打开问卷</Button>
+          </a>
+          <Button icon={<FileExcelOutlined />} loading={exporting} disabled={!responses.length} onClick={() => handleExport('csv')}>导出 CSV</Button>
+          <Button icon={<CloudDownloadOutlined />} loading={exporting} disabled={!responses.length} onClick={() => handleExport('json')}>导出 JSON</Button>
+        </Space>
       </div>
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12}><Card><Statistic title={survey.kind === 'exam' ? '试卷总数' : '答卷总数'} value={responses.length} /></Card></Col>
@@ -47,7 +78,7 @@ export default function Responses() {
           columns={[
             { title: '提交时间', dataIndex: 'submittedAt', width: 180 },
             ...survey.questions.map((q) => ({ title: q.title, key: q.id, ellipsis: true, width: 160,
-              render: (_, r) => { const ans = r.answers[q.id]; return ans ? display(ans.value) : '\u2014'; } })),
+              render: (_, r) => { const ans = r.answers[q.id]; return ans ? formatAnswer(ans.value) : '\u2014'; } })),
             ...(survey.kind === 'exam' ? [{ title: '得分', width: 100,
               render: (_, r) => r.score != null ? <Text strong>{r.score} / {r.maxScore}</Text> : '\u2014' }] : []),
           ]}

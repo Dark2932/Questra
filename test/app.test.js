@@ -159,6 +159,93 @@ test('考试权重计分、答案保密和逐题分值模式', async (t) => {
   assert.deepEqual(perQuestionExam.questions.map((question) => question.points), [5, 15]);
 });
 
+test('健康检查与提交限流', async (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-limit-'));
+  const db = openDatabase(path.join(tempDir, 'test.db'));
+  migrate(db);
+  const app = createApp({ db, adminToken: 'limit-token', config: { siteName: 'Test', hooks: {} } });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => {
+    server.close();
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const health = await fetch(`${baseUrl}/api/health`);
+  assert.equal(health.status, 200);
+  const healthData = await health.json();
+  assert.equal(healthData.status, 'ok');
+  assert.equal(healthData.database, 'ok');
+
+  const question = await (await fetch(`${baseUrl}/api/admin/questions`, {
+    method: 'POST', headers: { authorization: 'Bearer limit-token', 'content-type': 'application/json' },
+    body: JSON.stringify({ title: '限流题', type: 'single', options: ['A', 'B'], required: false })
+  })).json();
+  const survey = await (await fetch(`${baseUrl}/api/admin/surveys`, {
+    method: 'POST', headers: { authorization: 'Bearer limit-token', 'content-type': 'application/json' },
+    body: JSON.stringify({ title: '限流问卷', questionIds: [question.id] })
+  })).json();
+
+  // 提交限流上限为 30，前 30 次成功，第 31 次应返回 429。
+  const body = { answers: { [survey.questions[0].id]: 'A' } };
+  let last;
+  for (let i = 0; i < 31; i++) {
+    last = await fetch(`${baseUrl}/api/surveys/${survey.id}/responses`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+    });
+  }
+  assert.equal(last.status, 429);
+  assert.ok(Number(last.headers.get('Retry-After')) > 0);
+  const limited = await last.json();
+  assert.equal(typeof limited.error, 'string');
+});
+
+test('答卷导出 CSV 与 JSON', async (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-export-'));
+  const db = openDatabase(path.join(tempDir, 'test.db'));
+  migrate(db);
+  const app = createApp({ db, adminToken: 'export-token', config: { siteName: 'Test', hooks: {} } });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const headers = { authorization: 'Bearer export-token', 'content-type': 'application/json' };
+  t.after(() => {
+    server.close();
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const question = await (await fetch(`${baseUrl}/api/admin/questions`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ title: '编辑器,包含逗号', type: 'single', options: ['A', 'B'], required: true })
+  })).json();
+  const survey = await (await fetch(`${baseUrl}/api/admin/surveys`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ title: '导出问卷', questionIds: [question.id] })
+  })).json();
+  await fetch(`${baseUrl}/api/surveys/${survey.id}/responses`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ answers: { [survey.questions[0].id]: 'A' } })
+  });
+
+  const csv = await fetch(`${baseUrl}/api/admin/surveys/${survey.id}/export`, { headers });
+  assert.equal(csv.status, 200);
+  const csvText = await csv.text();
+  assert.match(csvText, /编辑器,包含逗号/);
+  assert.match(csvText, /提交时间/);
+  // text() 解码时会剥离 BOM，改用原始头部字节验证 UTF-8 BOM。
+  const csvBytes = await (await fetch(`${baseUrl}/api/admin/surveys/${survey.id}/export`, { headers })).arrayBuffer();
+  assert.deepEqual([...new Uint8Array(csvBytes, 0, 3)], [0xef, 0xbb, 0xbf], 'CSV 应带 UTF-8 BOM');
+
+  const json = await fetch(`${baseUrl}/api/admin/surveys/${survey.id}/export?format=json`, { headers });
+  assert.equal(json.status, 200);
+  const jsonData = await json.json();
+  assert.equal(jsonData.responses.length, 1);
+  assert.equal(jsonData.responses[0].answers[survey.questions[0].id], 'A');
+});
+
 test('选填单选题允许空答案，过期问卷拒绝提交', async (t) => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-edge-'));
   const db = openDatabase(path.join(tempDir, 'test.db'));

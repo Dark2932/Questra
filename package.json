@@ -13,13 +13,21 @@
     "views",
     "public",
     "migrations",
+    "client/dist",
     "survey.config.example.js"
   ],
   "scripts": {
     "start": "node bin/questra.js start",
     "migrate": "node bin/questra.js migrate",
     "dev": "node --watch bin/questra.js start",
-    "test": "node --test"
+    "test": "node --test \"test/*.test.js\"",
+    "lint": "eslint src bin scripts test",
+    "lint:client": "cd client && npm run lint",
+    "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\"",
+    "build:client": "node scripts/build-client.js",
+    "dev:client": "cd client && npm run dev",
+    "dev:all": "concurrently -k -n server,client \"node --watch bin/questra.js start\" \"cd client && npm run dev\"",
+    "prepack": "node scripts/build-client.js --prepack"
   },
   "engines": {
     "node": ">=18"
@@ -36,5 +44,11 @@
     "commander": "^14.0.0",
     "ejs": "^3.1.10",
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^9.2.4",
+    "eslint": "^10.9.0",
+    "prettier": "^3.9.6"
   }
 }

@@ -7,7 +7,7 @@ Questra 是面向个人开发者的轻量级自托管问卷与考试框架。后
 ```bash
 npm install
 npm run migrate
-cd client && npm install && npm run build && cd ..
+npm run build:client
 npm start
 ```
 
@@ -26,17 +26,20 @@ Node.js 最低版本为 18。生产环境建议由 Caddy 或 Nginx 终止 HTTPS�
 
 ```text
 Questra/
+├─ .github/workflows/ci.yml       # CI：测试、Lint、构建与打包校验
 ├─ bin/
-│  └─ questra.js                 # commander CLI：start / migrate
+│  └─ questra.js                 # commander CLI：start / migrate / backup
 ├─ client/                       # 前端 React 应用
 │  ├─ src/
 │  │  ├─ components/             # 布局与 UI 组件
 │  │  ├─ pages/                  # 页面组件（管理端 + 公开问卷）
 │  │  ├─ hooks/                  # 主题切换等自定义 Hook
+│  │  ├─ lib/                    # 展示格式化等纯函数（含 Vitest 单测）
 │  │  ├─ api.js                  # API 请求封装
 │  │  ├─ App.jsx                 # 路由与主题配置
 │  │  └─ main.jsx                # 入口
 │  ├─ dist/                      # 构建产物（生产环境由 Express 托管）
+│  ├─ eslint.config.js
 │  ├─ package.json
 │  ├─ vite.config.js
 │  └─ tailwind.config.js
@@ -44,9 +47,13 @@ Questra/
 │  ├─ 001_initial.sql            # 问卷基础 DDL 与索引
 │  └─ 002_exam_scoring.sql       # 标准答案与考试计分字段
 ├─ public/                       # 旧版静态资源（保留向后兼容）
+├─ scripts/
+│  └─ build-client.js            # npm pack / publish 前自动构建前端
 ├─ src/
 │  ├─ lib/                       # HTTP 辅助与序列化
 │  ├─ middleware/admin-auth.js   # Admin Token 校验
+│  ├─ middleware/security.js     # 安全响应头（CSP 等）
+│  ├─ middleware/rate-limit.js   # 内存限流（提交与写接口）
 │  ├─ routes/                    # 管理 API 和公开路由
 │  ├─ services/survey-service.js # 深拷贝、校验与事务
 │  ├─ app.js                     # Express 应用装配
@@ -54,6 +61,7 @@ Questra/
 │  └─ db.js                      # SQLite 连接与迁移
 ├─ test/app.test.js              # 核心链路集成测试
 ├─ views/                        # 旧版 EJS 模板（保留向后兼容）
+├─ eslint.config.mjs             # 后端 ESLint 配置
 ├─ package.json
 ├─ survey.config.js              # 当前项目配置与钩子示例
 └─ survey.config.example.js      # 发布包内的配置模板
@@ -64,14 +72,27 @@ Questra/
 前端开发服务器（端口 5173）会自动代理 API 请求到后端（端口 3000）：
 
 ```bash
-# 终端 1：启动后端
-npm run dev
+# 一键同时启动后端与前端开发服务器
+npm run dev:all
 
-# 终端 2：启动前端开发服务器
-cd client && npm run dev
+# 或分开启动
+npm run dev         # 终端 1：后端（--watch 自动重载）
+npm run dev:client  # 终端 2：前端开发服务器
 ```
 
 访问 `http://localhost:5173/admin?token=xxx` 进行开发调试。
+
+### 质量检查
+
+```bash
+npm run lint         # 后端 ESLint
+npm run lint:client  # 前端 ESLint
+npm run format       # 后端 Prettier
+npm test             # 后端集成测试（node:test）
+cd client && npm run lint && npm test && npm run build  # 前端全链路
+```
+
+GitHub Actions（`.github/workflows/ci.yml`）会在每次 push 时自动执行后端测试与 Lint、前端 Lint/测试/构建，并校验 npm 发布包包含 `client/dist`。
 
 ## 数据库 Schema
 
@@ -87,10 +108,11 @@ SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个
 
 ## REST API
 
-管理 API 必须携带 `Authorization: Bearer <token>`、`x-admin-token` 或 Admin Token Cookie。浏览器首次通过 `/admin?token=<token>` 进入时会自动写入 HttpOnly Cookie。
+管理 API 必须携带 `Authorization: Bearer <token>`、`x-admin-token` 或 Admin Token Cookie。浏览器首次通过 `/admin?token=<token>` 进入时会自动写入 HttpOnly Cookie。管理 API 和公开提交接口均按 IP 限流（60 次/分钟、提交 30 次/分钟），超限返回 `429`。
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
+| `GET` | `/api/health` | 健康检查（含数据库连通性，供反向代理 / systemd 探测） |
 | `GET` | `/api/config` | 获取站点配置 |
 | `GET` | `/api/admin/dashboard` | 仪表盘统计和七日趋势 |
 | `GET/POST` | `/api/admin/questions` | 列出或创建题目 |
@@ -98,8 +120,9 @@ SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个
 | `GET/POST` | `/api/admin/surveys` | 列出或深拷贝生成问卷 |
 | `GET/PUT/DELETE` | `/api/admin/surveys/:id` | 查看、更新或删除问卷 |
 | `GET` | `/api/admin/surveys/:id/responses` | 查看回收明细 |
+| `GET` | `/api/admin/surveys/:id/export?format=csv\|json` | 导出答卷（默认 CSV，带 UTF-8 BOM，Excel 可直接打开） |
 | `GET` | `/api/surveys/:id` | 获取有效公开问卷 |
-| `POST` | `/api/surveys/:id/responses` | 校验并提交答卷 |
+| `POST` | `/api/surveys/:id/responses` | 校验并提交答卷（限流 30 次/分钟/IP） |
 
 创建题目：
 
@@ -163,19 +186,28 @@ SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个
 ## CLI
 
 ```bash
-npm start                                      # 启动服务
-npm run dev                                    # 监听文件变化
-npm run migrate                                # 手动迁移
+npm start                      # 启动服务
+npm run dev                    # 监听文件变化
+npm run migrate                # 手动迁移
 npx questra start --config ./prod.js --port 8080
+npx questra backup             # 在线备份数据库（WAL 安全，无需停机）
+npx questra backup -o /backup/questra.db
 ```
 
-默认数据库为启动目录下的 `data/questra.db`，该目录已加入 `.gitignore`。备份时复制数据库文件即可；WAL 模式下建议先停止服务再复制，或使用 SQLite 在线备份命令。
+默认数据库为启动目录下的 `data/questra.db`，该目录已加入 `.gitignore`。直接复制数据库文件时建议先停止服务（WAL 模式存在未合并的 `-wal` / `-shm` 文件）；推荐使用 `npx questra backup`，它利用 SQLite 在线备份 API，服务运行期间也能导出一致性快照。数据库损坏时，先备份当前版本再重新执行 `npm run migrate` 重建。
+
+## 运维建议
+
+- 生产环境使用 Caddy 或 Nginx 终止 HTTPS；`/api/health` 可配置为反向代理或 systemd 的探活端点。
+- 服务公开了安全响应头（CSP、`nosniff`、`X-Frame-Options: DENY` 等），仅在 `NODE_ENV=production` 时启用，开发模式不受影响。
+- 只需公开实际使用的端口；管理地址随机 Token 每次启动都会重新生成，建议固定 `QUESTRA_ADMIN_TOKEN` 并妥善保管。
 
 ## 设计系统
 
-- **框架**：React 18 + Vite + Ant Design 5
+- **框架**：React 18 + Vite + Ant Design 6
 - **样式**：Tailwind CSS + CSS Variables
 - **主题**：浅色/深色模式，暗色模式采用 Apple 设计风格（纯黑底 + 毛玻璃头部）
-- **配色**：Productivity Tool 规范，主色 `#0D9488`（teal-600）
-- **动效**：克制优雅，200-300ms 平滑过渡，无花哨特效
+- **配色**：Apple HIG 语义色，暗色基底 `#000000`、分层灰 `#1c1c1e` / `#2c2c2e`，10px 圆角
+- **动效**：克制优雅，页面切换 200ms easeOut（framer-motion），无花哨特效
+- **测试**：后端 `node:test` 集成测试，前端 Vitest 单测，CI 自动执行 Lint / Test / Build / 打包校验
 

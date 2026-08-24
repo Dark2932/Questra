@@ -3,7 +3,7 @@
 const express = require('express');
 const { asyncRoute } = require('../lib/http');
 
-function createPublicRoutes({ db, config, surveyService }) {
+function createPublicRoutes({ config, surveyService, submitLimiter }) {
   const router = express.Router();
 
   router.get('/api/surveys/:id', (req, res) => {
@@ -12,7 +12,8 @@ function createPublicRoutes({ db, config, surveyService }) {
     res.json(survey);
   });
 
-  router.post('/api/surveys/:id/responses', asyncRoute(async (req, res) => {
+  // HTTP/1 代理场景：限制单 IP 提交频率，降低恶意灌数据风险。
+  router.post('/api/surveys/:id/responses', submitLimiter, asyncRoute(async (req, res) => {
     // 判分需要内部标准答案，但这些字段从不通过公开 GET API 或 EJS 页面下发。
     const survey = surveyService.getSurvey(req.params.id, true, true);
     surveyService.ensureSurveyOpen(survey);

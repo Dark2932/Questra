@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { asyncRoute, HttpError } = require('../lib/http');
+const { HttpError } = require('../lib/http');
 const { parseJson, serializeQuestion, serializeSurvey } = require('../lib/serializers');
 
 function createAdminApi({ db, surveyService }) {
@@ -116,6 +116,51 @@ function createAdminApi({ db, surveyService }) {
     const result = db.prepare('DELETE FROM surveys WHERE id = ?').run(req.params.id);
     if (!result.changes) throw new HttpError(404, '问卷不存在');
     res.status(204).end();
+  });
+
+  router.get('/surveys/:id/export', (req, res) => {
+    const survey = surveyService.getSurvey(req.params.id, true, true);
+    const responseRows = db.prepare('SELECT * FROM responses WHERE survey_id = ? ORDER BY submitted_at ASC').all(req.params.id);
+    const answersByResponse = db.prepare('SELECT survey_question_id, value_json FROM answers WHERE response_id = ?');
+    const questions = survey.questions.map((q) => ({ id: q.id, title: q.title }));
+
+    const rows = responseRows.map((response) => {
+      const answers = Object.fromEntries(answersByResponse.all(response.id).map((answer) => [
+        answer.survey_question_id,
+        parseJson(answer.value_json, null)
+      ]));
+      return {
+        submittedAt: response.submitted_at,
+        answers,
+        score: response.score === null ? null : Number(response.score),
+        maxScore: response.max_score === null ? null : Number(response.max_score)
+      };
+    });
+
+    const format = String(req.query.format || 'csv').toLowerCase();
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="survey-${survey.id}.json"`);
+      return res.json({ survey, responses: rows });
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="survey-${survey.id}.csv"`);
+    // UTF-8 BOM 让 Excel 正确识别中文。
+    const header = ['提交时间', ...questions.map((q) => q.title), ...(survey.kind === 'exam' ? ['得分', '满分'] : [])];
+    const lines = [header, ...rows.map((row) => [
+      row.submittedAt,
+      ...questions.map((q) => {
+        const value = row.answers[q.id];
+        return Array.isArray(value) ? value.join('、') : (value === null || value === undefined ? '' : String(value));
+      }),
+      ...(survey.kind === 'exam' ? [row.score ?? '', row.maxScore ?? ''] : [])
+    ])];
+    const csv = lines.map((line) => line.map((cell) => {
+      const text = String(cell);
+      return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }).join(',')).join('\r\n');
+    res.send('\uFEFF' + csv);
   });
 
   router.get('/surveys/:id/responses', (req, res) => {

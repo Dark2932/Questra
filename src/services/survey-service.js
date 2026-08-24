@@ -254,7 +254,7 @@ function normalizedText(value) {
 function gradeAnswer(kind, answer) {
   if (kind !== 'exam') return { ...answer, isCorrect: null, awardedScore: null };
   const expected = answer.question.correctAnswer;
-  let isCorrect = false;
+  let isCorrect;
   if (answer.question.type === 'multiple') {
     const actualSet = new Set(answer.value);
     isCorrect = Array.isArray(expected)

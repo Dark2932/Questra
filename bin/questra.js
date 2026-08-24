@@ -2,6 +2,8 @@
 
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const { Command } = require('commander');
 const { randomUUID } = require('node:crypto');
 const { loadConfig } = require('../src/config');
@@ -61,6 +63,24 @@ program
     const applied = migrate(db);
     db.close();
     console.log(applied.length ? `已执行迁移: ${applied.join(', ')}` : '数据库已是最新版本。');
+  });
+
+program
+  .command('backup')
+  .description('将数据库在线备份到文件（WAL 安全，无需停止服务）')
+  .option('-c, --config <path>', '配置文件路径')
+  .option('-o, --output <path>', '备份文件输出路径')
+  .action(async (options) => {
+    const config = loadConfig(options.config);
+    const db = openDatabase(config.database);
+    const defaultName = `questra-backup-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.db`;
+    const output = path.resolve(process.cwd(), options.output || path.join('data', defaultName));
+    console.log(`备份数据库: ${config.database}`);
+    console.log(`输出文件: ${output}`);
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    await db.backup(output);
+    db.close();
+    console.log('备份完成。');
   });
 
 program.parseAsync(process.argv).catch((error) => {

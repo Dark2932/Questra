@@ -26,6 +26,17 @@ export const api = {
   updateSurvey: (id, data) => request(`/admin/surveys/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSurvey: (id) => request(`/admin/surveys/${id}`, { method: 'DELETE' }),
   getSurveyResponses: (id) => request(`/admin/surveys/${id}/responses`),
+  exportSurveyResponses: async (id, format = 'csv') => {
+    const token = sessionStorage.getItem('questra_admin_token') || '';
+    const res = await fetch(`${API}/admin/surveys/${id}/export?format=${format}`, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `导出失败 (${res.status})`);
+    }
+    return res.blob();
+  },
 
   getPublicSurvey: (id) =>
     fetch(`/api/surveys/${id}`).then(async (r) => {

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, Select, DatePicker, Checkbox, Typography, Space, App } from 'antd';
+import { Modal, Form, Input, Select, DatePicker, Checkbox, Typography, App } from 'antd';
 import ExamSettings from './ExamSettings';
 
 const { TextArea } = Input;
@@ -41,7 +41,7 @@ export default function SurveyDialog({ open, onClose, questions, onSubmit }) {
         }
       }
       onSubmit(payload);
-    } catch (e) { /* validation error */ }
+    } catch { /* validation error */ }
   };
 
   return (

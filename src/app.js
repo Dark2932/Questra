@@ -8,6 +8,8 @@ const { createSurveyService } = require('./services/survey-service');
 const { createAdminApi } = require('./routes/admin-api');
 const { createAdminPages } = require('./routes/admin-pages');
 const { createPublicRoutes } = require('./routes/public');
+const { securityHeaders } = require('./middleware/security');
+const { createRateLimit } = require('./middleware/rate-limit');
 
 function createApp({ db, config, adminToken }) {
   const app = express();
@@ -15,20 +17,40 @@ function createApp({ db, config, adminToken }) {
   const adminAuth = createAdminAuth(adminToken);
   const distPath = path.join(__dirname, '..', 'client', 'dist');
   const spaAvailable = fs.existsSync(path.join(distPath, 'index.html'));
+  // 个人服务器场景：提交接口和写操作按 IP 限流，防止脚本灌入。
+  const submitLimiter = createRateLimit({ windowMs: 60_000, max: 30 });
+  const adminWriteLimiter = createRateLimit({ windowMs: 60_000, max: 60 });
 
   app.disable('x-powered-by');
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.locals.siteName = config.siteName;
+  app.use(securityHeaders);
   app.use(express.json({ limit: '256kb' }));
   app.use(express.urlencoded({ extended: false, limit: '256kb' }));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
 
   app.get('/api/config', (req, res) => res.json({ siteName: config.siteName }));
 
+  // 健康检查：验证服务进程与数据库连接，供反向代理 / systemd 探测。
+  app.get('/api/health', (req, res) => {
+    let database = 'ok';
+    try {
+      db.prepare('SELECT 1').get();
+    } catch {
+      database = 'error';
+    }
+    res.status(database === 'ok' ? 200 : 503).json({
+      status: database === 'ok' ? 'ok' : 'degraded',
+      database,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  });
+
   app.get('/', (req, res) => res.redirect('/admin'));
-  app.use(createPublicRoutes({ db, config, surveyService }));
-  app.use('/api/admin', adminAuth, createAdminApi({ db, surveyService }));
+  app.use(createPublicRoutes({ db, config, surveyService, submitLimiter }));
+  app.use('/api/admin', adminWriteLimiter, adminAuth, createAdminApi({ db, surveyService }));
 
   if (spaAvailable) {
     app.use('/assets', express.static(path.join(distPath, 'assets'), { maxAge: '1h', immutable: true }));

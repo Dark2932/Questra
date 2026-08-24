@@ -27,10 +27,10 @@ function loadConfig(configPath) {
     port: 3000,
     host: '0.0.0.0',
     siteName: 'Questra',
-    hooks: {},
     ...userConfig,
     // 相对数据库路径始终以进程启动目录为基准，而不是 npm 包目录。
     database: path.resolve(process.cwd(), database),
+    // userConfig.hooks 可能缺省或为 null，这里统一归一化为对象。
     hooks: userConfig.hooks || {}
   };
 }

@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { Button, Input, Radio, Checkbox, Space, Typography, Alert, Card } from 'antd';
+import { Button, Input, Radio, Checkbox, Space, Typography, Alert } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 
 const { TextArea } = Input;
