@@ -1,12 +1,13 @@
 # Questra
 
-Questra 是面向个人开发者的轻量级自托管问卷与考试框架。它使用 Node.js、Express、EJS 和 SQLite，无前端构建步骤，适合直接运行在低配个人服务器上。
+Questra 是面向个人开发者的轻量级自托管问卷与考试框架。后端使用 Node.js、Express 和 SQLite，前端使用 React、Vite、Ant Design 和 Tailwind CSS。生产环境由 Express 统一托管前端构建产物，适合直接运行在低配个人服务器上。
 
 ## 快速开始
 
 ```bash
 npm install
 npm run migrate
+cd client && npm install && npm run build && cd ..
 npm start
 ```
 
@@ -27,27 +28,50 @@ Node.js 最低版本为 18。生产环境建议由 Caddy 或 Nginx 终止 HTTPS�
 Questra/
 ├─ bin/
 │  └─ questra.js                 # commander CLI：start / migrate
+├─ client/                       # 前端 React 应用
+│  ├─ src/
+│  │  ├─ components/             # 布局与 UI 组件
+│  │  ├─ pages/                  # 页面组件（管理端 + 公开问卷）
+│  │  ├─ hooks/                  # 主题切换等自定义 Hook
+│  │  ├─ api.js                  # API 请求封装
+│  │  ├─ App.jsx                 # 路由与主题配置
+│  │  └─ main.jsx                # 入口
+│  ├─ dist/                      # 构建产物（生产环境由 Express 托管）
+│  ├─ package.json
+│  ├─ vite.config.js
+│  └─ tailwind.config.js
 ├─ migrations/
 │  ├─ 001_initial.sql            # 问卷基础 DDL 与索引
 │  └─ 002_exam_scoring.sql       # 标准答案与考试计分字段
-├─ public/
-│  ├─ admin.js                   # 管理端原生 JS
-│  ├─ survey.js                  # 用户端提交逻辑
-│  └─ styles.css                 # 响应式双端样式
+├─ public/                       # 旧版静态资源（保留向后兼容）
 ├─ src/
 │  ├─ lib/                       # HTTP 辅助与序列化
 │  ├─ middleware/admin-auth.js   # Admin Token 校验
-│  ├─ routes/                    # 管理 API、页面和公开路由
+│  ├─ routes/                    # 管理 API 和公开路由
 │  ├─ services/survey-service.js # 深拷贝、校验与事务
 │  ├─ app.js                     # Express 应用装配
 │  ├─ config.js                  # 配置加载
 │  └─ db.js                      # SQLite 连接与迁移
 ├─ test/app.test.js              # 核心链路集成测试
-├─ views/                        # 双端 EJS 模板
+├─ views/                        # 旧版 EJS 模板（保留向后兼容）
 ├─ package.json
 ├─ survey.config.js              # 当前项目配置与钩子示例
 └─ survey.config.example.js      # 发布包内的配置模板
 ```
+
+## 开发模式
+
+前端开发服务器（端口 5173）会自动代理 API 请求到后端（端口 3000）：
+
+```bash
+# 终端 1：启动后端
+npm run dev
+
+# 终端 2：启动前端开发服务器
+cd client && npm run dev
+```
+
+访问 `http://localhost:5173/admin?token=xxx` 进行开发调试。
 
 ## 数据库 Schema
 
@@ -59,7 +83,7 @@ Questra/
 - `responses`：一次问卷或考试提交，考试记录总分和满分。
 - `answers`：逐题答案、多选 JSON 数组、正确性和本题得分。
 
-SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个数据库连接，不加载 SPA、ORM 或图表运行库，以控制内存占用。
+SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个数据库连接，不加载 ORM 或图表运行库，以控制内存占用。
 
 ## REST API
 
@@ -67,6 +91,7 @@ SQLite 启用外键、WAL 和 `synchronous=NORMAL`。一个进程只持有一个
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
+| `GET` | `/api/config` | 获取站点配置 |
 | `GET` | `/api/admin/dashboard` | 仪表盘统计和七日趋势 |
 | `GET/POST` | `/api/admin/questions` | 列出或创建题目 |
 | `PUT/DELETE` | `/api/admin/questions/:id` | 更新或删除题目 |
@@ -145,3 +170,12 @@ npx questra start --config ./prod.js --port 8080
 ```
 
 默认数据库为启动目录下的 `data/questra.db`，该目录已加入 `.gitignore`。备份时复制数据库文件即可；WAL 模式下建议先停止服务再复制，或使用 SQLite 在线备份命令。
+
+## 设计系统
+
+- **框架**：React 18 + Vite + Ant Design 5
+- **样式**：Tailwind CSS + CSS Variables
+- **主题**：浅色/深色模式，暗色模式采用 Apple 设计风格（纯黑底 + 毛玻璃头部）
+- **配色**：Productivity Tool 规范，主色 `#0D9488`（teal-600）
+- **动效**：克制优雅，200-300ms 平滑过渡，无花哨特效
+
