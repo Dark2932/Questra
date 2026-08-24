@@ -1,0 +1,23 @@
+<%- include('../partials/admin-head', { title: '问卷', current: 'surveys', siteName }) %>
+  <div class="page-heading">
+    <div><p class="eyebrow">SURVEYS</p><h1>问卷</h1></div>
+    <button class="button primary" type="button" data-open-survey>生成问卷</button>
+  </div>
+
+  <section class="panel">
+    <div class="section-title"><div><h2>问卷实例</h2><p>分享公开链接，管理状态并查看回收数据。</p></div></div>
+    <div id="survey-list" class="table-wrap"><p class="loading">正在加载…</p></div>
+  </section>
+
+  <dialog id="survey-dialog" class="wide-dialog">
+    <form id="survey-form" method="dialog">
+      <div class="dialog-head"><h2>生成问卷</h2><button class="icon-button" type="button" data-close aria-label="关闭">×</button></div>
+      <label>问卷标题<input name="title" maxlength="200" required placeholder="例如：活动反馈问卷"></label>
+      <label>说明<textarea name="description" rows="3" placeholder="选填，向填写者说明问卷用途"></textarea></label>
+      <label>截止时间<input name="expiresAt" type="datetime-local"></label>
+      <fieldset><legend>从问题池选择题目</legend><div id="survey-question-options" class="choice-list"><p class="loading">正在加载…</p></div></fieldset>
+      <p id="survey-error" class="form-error"></p>
+      <div class="dialog-actions"><button class="button" type="button" data-close>取消</button><button class="button primary" type="submit">生成问卷</button></div>
+    </form>
+  </dialog>
+<%- include('../partials/admin-foot') %>

@@ -1,0 +1,59 @@
+<%- include('../partials/admin-head', { title: '仪表盘', current: 'dashboard', siteName }) %>
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">OVERVIEW</p>
+      <h1>仪表盘</h1>
+    </div>
+    <a class="button primary" href="/admin/surveys">新建问卷</a>
+  </div>
+
+  <section class="metrics" aria-label="数据概览">
+    <article><span>题库题目</span><strong><%= totals.questions %></strong></article>
+    <article><span>问卷总数</span><strong><%= totals.surveys %></strong></article>
+    <article><span>回收中</span><strong><%= totals.active_surveys %></strong></article>
+    <article><span>答卷总数</span><strong><%= totals.responses %></strong></article>
+  </section>
+
+  <section class="panel chart-panel">
+    <div class="section-title">
+      <div><h2>近 7 日回收</h2><p>按答卷提交日期统计</p></div>
+    </div>
+    <% const maxCount = Math.max(1, ...trend.map(item => item.count)); %>
+    <div class="bar-chart" aria-label="近七日答卷柱状图">
+      <% trend.forEach(item => { %>
+        <div class="bar-column">
+          <span class="bar-value"><%= item.count %></span>
+          <div class="bar-track"><div class="bar" style="height:<%= Math.max(item.count ? 10 : 2, item.count / maxCount * 100) %>%"></div></div>
+          <span class="bar-label"><%= item.day.slice(5) %></span>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">
+      <div><h2>最近问卷</h2><p>查看当前问卷状态与回收进度</p></div>
+      <a class="text-link" href="/admin/surveys">查看全部</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>问卷</th><th>状态</th><th>题目</th><th>答卷</th><th>创建时间</th><th></th></tr></thead>
+        <tbody>
+          <% if (!recentSurveys.length) { %>
+            <tr><td colspan="6" class="empty-cell">还没有问卷，请先从问题池创建题目。</td></tr>
+          <% } %>
+          <% recentSurveys.forEach(survey => { %>
+            <tr>
+              <td><strong><%= survey.title %></strong></td>
+              <td><span class="status <%= survey.status %>"><%= survey.status === 'active' ? '回收中' : '已关闭' %></span></td>
+              <td><%= survey.question_count %></td>
+              <td><%= survey.response_count %></td>
+              <td><%= survey.created_at.replace('T', ' ').slice(0, 16) %></td>
+              <td><a class="text-link" href="/admin/surveys/<%= survey.id %>/responses">数据</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<%- include('../partials/admin-foot') %>

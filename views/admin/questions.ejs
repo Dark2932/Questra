@@ -1,0 +1,28 @@
+<%- include('../partials/admin-head', { title: '问题池', current: 'questions', siteName }) %>
+  <div class="page-heading">
+    <div><p class="eyebrow">QUESTION POOL</p><h1>问题池</h1></div>
+    <button class="button primary" type="button" data-open-question>添加题目</button>
+  </div>
+
+  <section class="panel">
+    <div class="section-title"><div><h2>公共题目模板</h2><p>问卷生成时会复制题目，之后修改不会影响已有问卷。</p></div></div>
+    <div id="question-list" class="item-list"><p class="loading">正在加载…</p></div>
+  </section>
+
+  <dialog id="question-dialog">
+    <form id="question-form" method="dialog">
+      <div class="dialog-head"><h2 id="question-form-title">添加题目</h2><button class="icon-button" type="button" data-close aria-label="关闭">×</button></div>
+      <input type="hidden" name="id">
+      <label>题目标题<input name="title" maxlength="500" required placeholder="请输入题目内容"></label>
+      <label>题目类型
+        <select name="type">
+          <option value="single">单选</option><option value="multiple">多选</option><option value="text">填空 / 开放文本</option>
+        </select>
+      </label>
+      <label id="options-field">选项（每行一个）<textarea name="options" rows="5" placeholder="选项 A&#10;选项 B"></textarea></label>
+      <label class="check-row"><input type="checkbox" name="required"><span>设为必填题</span></label>
+      <p id="question-error" class="form-error"></p>
+      <div class="dialog-actions"><button class="button" type="button" data-close>取消</button><button class="button primary" type="submit">保存</button></div>
+    </form>
+  </dialog>
+<%- include('../partials/admin-foot') %>

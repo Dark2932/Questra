@@ -1,0 +1,11 @@
+<%- include('../partials/admin-head', { title: '回收数据', current: 'surveys', siteName }) %>
+  <div class="page-heading">
+    <div><a class="back-link" href="/admin/surveys">← 返回问卷</a><h1><%= survey.title %></h1><p class="page-subtitle">回收数据</p></div>
+    <a class="button" href="/s/<%= survey.id %>" target="_blank" rel="noopener">打开问卷</a>
+  </div>
+  <section class="metrics compact" id="response-metrics"><article><span>答卷总数</span><strong>—</strong></article></section>
+  <section class="panel">
+    <div class="section-title"><div><h2>答卷明细</h2><p>多选答案使用顿号分隔展示。</p></div></div>
+    <div id="response-table" class="table-wrap" data-survey-id="<%= survey.id %>"><p class="loading">正在加载…</p></div>
+  </section>
+<%- include('../partials/admin-foot') %>

@@ -1,0 +1,40 @@
+{
+  "name": "questra",
+  "version": "0.1.0",
+  "description": "面向个人开发者的轻量级自托管问卷框架",
+  "type": "commonjs",
+  "main": "src/app.js",
+  "bin": {
+    "questra": "bin/questra.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "views",
+    "public",
+    "migrations",
+    "survey.config.example.js"
+  ],
+  "scripts": {
+    "start": "node bin/questra.js start",
+    "migrate": "node bin/questra.js migrate",
+    "dev": "node --watch bin/questra.js start",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "survey",
+    "questionnaire",
+    "sqlite",
+    "self-hosted"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "commander": "^14.0.0",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0"
+  }
+}

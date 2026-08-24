@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title><%= title %> · <%= siteName %></title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="admin-body">
+  <header class="admin-header">
+    <a class="brand" href="/admin"><span class="brand-mark">Q</span><span><%= siteName %></span></a>
+    <nav aria-label="管理导航">
+      <a class="<%= current === 'dashboard' ? 'active' : '' %>" href="/admin">仪表盘</a>
+      <a class="<%= current === 'questions' ? 'active' : '' %>" href="/admin/questions">问题池</a>
+      <a class="<%= current === 'surveys' ? 'active' : '' %>" href="/admin/surveys">问卷</a>
+    </nav>
+  </header>
+  <main class="admin-main">
