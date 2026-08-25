@@ -4,18 +4,20 @@ const { randomUUID } = require('node:crypto');
 const { HttpError } = require('../lib/http');
 const { serializeQuestion, serializeSurvey } = require('../lib/serializers');
 
-const QUESTION_TYPES = new Set(['single', 'multiple', 'text']);
+const QUESTION_TYPES = new Set(['single', 'multiple', 'text', 'judgment']);
 
 function normalizeQuestion(input) {
   const title = String(input.title || '').trim();
-  const type = String(input.type || '');
+  const requestedType = String(input.type || '');
+  const type = requestedType === 'judgment' ? 'single' : requestedType;
+  const isJudgment = requestedType === 'judgment' || input.isJudgment === true || input.isJudgment === 1;
   const required = input.required === true || input.required === 1 || input.required === '1';
-  const options = Array.isArray(input.options)
+  const options = isJudgment ? ['正确', '错误'] : (Array.isArray(input.options)
     ? input.options.map((option) => String(option).trim()).filter(Boolean)
-    : [];
+    : []);
 
   if (!title) throw new HttpError(400, '题目标题不能为空');
-  if (!QUESTION_TYPES.has(type)) throw new HttpError(400, '不支持的题目类型');
+  if (!QUESTION_TYPES.has(requestedType)) throw new HttpError(400, '不支持的题目类型');
   if ((type === 'single' || type === 'multiple') && options.length < 2) {
     throw new HttpError(400, '单选题和多选题至少需要两个选项');
   }
@@ -36,7 +38,7 @@ function normalizeQuestion(input) {
     }
   }
 
-  return { title, type, required, options: finalOptions, correctAnswer };
+  return { title, type, isJudgment, required, options: finalOptions, correctAnswer };
 }
 
 function parseOptionalDate(value) {
@@ -55,6 +57,52 @@ function createSurveyService(db) {
     FROM surveys s WHERE s.id = ?
   `);
   const questionsBySurvey = db.prepare('SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY sort_order, id');
+
+  function listGroups() {
+    const rows = db.prepare('SELECT g.*, COUNT(gi.question_id) AS question_count FROM question_groups g LEFT JOIN question_group_items gi ON gi.group_id = g.id GROUP BY g.id ORDER BY g.name COLLATE NOCASE').all();
+    const total = db.prepare('SELECT COUNT(*) AS count FROM question_pool').get().count;
+    return [{ id: 'all', name: '全部问题', virtual: true, questionCount: Number(total) }, ...rows.map((row) => ({ id: row.id, name: row.name, questionCount: Number(row.question_count), createdAt: row.created_at, updatedAt: row.updated_at }))];
+  }
+  function groupQuestionIds(groupId) {
+    if (groupId === undefined || groupId === null || String(groupId) === 'all') return db.prepare('SELECT id FROM question_pool ORDER BY id').all().map((row) => row.id);
+    if (!db.prepare('SELECT id FROM question_groups WHERE id = ?').get(groupId)) throw new HttpError(404, '分组不存在');
+    return db.prepare('SELECT question_id FROM question_group_items WHERE group_id = ? ORDER BY question_id').all(groupId).map((row) => row.question_id);
+  }
+  function createGroup(input = {}) {
+    const name = String(input.name || '').trim();
+    if (!name || name === '全部问题') throw new HttpError(400, '分组名称无效');
+    try {
+      const result = db.prepare('INSERT INTO question_groups (name) VALUES (?)').run(name);
+      return listGroups().find((group) => group.id === Number(result.lastInsertRowid));
+    } catch (error) {
+      if (String(error.message).includes('UNIQUE')) throw new HttpError(409, '分组名称已存在');
+      throw error;
+    }
+  }
+  function updateGroup(id, input = {}) {
+    const name = String(input.name || '').trim();
+    if (!name || name === '全部问题') throw new HttpError(400, '分组名称无效');
+    const result = db.prepare("UPDATE question_groups SET name = ?, updated_at = datetime('now') WHERE id = ?").run(name, id);
+    if (!result.changes) throw new HttpError(404, '分组不存在');
+    return listGroups().find((group) => group.id === Number(id));
+  }
+  function deleteGroup(id) {
+    const result = db.prepare('DELETE FROM question_groups WHERE id = ?').run(id);
+    if (!result.changes) throw new HttpError(404, '分组不存在');
+  }
+  function setQuestionGroups(questionId, groupIds) {
+    const ids = [...new Set((Array.isArray(groupIds) ? groupIds : []).map(Number).filter(Number.isInteger))];
+    const valid = ids.length ? db.prepare('SELECT id FROM question_groups WHERE id IN (' + ids.map(() => '?').join(',') + ')').all(...ids).map((row) => row.id) : [];
+    if (valid.length !== ids.length) throw new HttpError(400, '题目分组无效');
+    db.transaction(() => {
+      db.prepare('DELETE FROM question_group_items WHERE question_id = ?').run(questionId);
+      const insert = db.prepare('INSERT INTO question_group_items (group_id, question_id) VALUES (?, ?)');
+      valid.forEach((groupId) => insert.run(groupId, questionId));
+    })();
+  }
+  function questionGroupIds(questionId) {
+    return db.prepare('SELECT group_id FROM question_group_items WHERE question_id = ? ORDER BY group_id').all(questionId).map((row) => row.group_id);
+  }
 
   function getSurvey(id, includeQuestions = true, includeAnswers = false) {
     const row = surveyById.get(id);
@@ -75,9 +123,23 @@ function createSurveyService(db) {
   function createSurvey(input) {
     const title = String(input.title || '').trim();
     const description = String(input.description || '').trim();
-    const questionIds = Array.isArray(input.questionIds)
+    let questionIds = Array.isArray(input.questionIds)
       ? [...new Set(input.questionIds.map(Number).filter(Number.isInteger))]
       : [];
+    const selectionMode = input.selectionMode === 'random' ? 'random' : 'manual';
+    const sourceGroupId = input.sourceGroupId === undefined || input.sourceGroupId === null || input.sourceGroupId === 'all' ? null : Number(input.sourceGroupId);
+    if (selectionMode === 'random') {
+      const sourceQuestions = groupQuestionIds(sourceGroupId === null ? 'all' : sourceGroupId).map((id) => poolById.get(id));
+      const counts = input.randomCounts && typeof input.randomCounts === 'object' ? input.randomCounts : {};
+      questionIds = [];
+      for (const type of ['single', 'multiple', 'text', 'judgment']) {
+        const wanted = Number(counts[type] || 0);
+        if (!Number.isInteger(wanted) || wanted < 0) throw new HttpError(400, '随机抽题数量必须是非负整数');
+        const candidates = sourceQuestions.filter((question) => (question.is_judgment ? 'judgment' : question.type) === type);
+        if (wanted > candidates.length) throw new HttpError(400, '题型“' + type + '”抽取数量不能超过组内数量');
+        questionIds.push(...candidates.sort(() => Math.random() - 0.5).slice(0, wanted).map((question) => question.id));
+      }
+    }
     const expiresAt = parseOptionalDate(input.expiresAt);
     const kind = input.kind === 'exam' ? 'exam' : 'survey';
     if (!title) throw new HttpError(400, '问卷标题不能为空');
@@ -100,17 +162,17 @@ function createSurveyService(db) {
     const id = randomUUID();
     const insertSurvey = db.prepare(`
       INSERT INTO surveys
-        (id, title, description, expires_at, kind, scoring_mode, max_score, scoring_config_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (id, title, description, expires_at, kind, scoring_mode, max_score, scoring_config_json, selection_mode, source_group_id, selection_config_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertQuestion = db.prepare(`
       INSERT INTO survey_questions
-        (survey_id, pool_question_id, title, type, options_json, is_required, sort_order, correct_answer_json, points)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (survey_id, pool_question_id, title, type, options_json, is_required, sort_order, correct_answer_json, points, is_judgment)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     db.transaction(() => {
-      insertSurvey.run(id, title, description, expiresAt, kind, scoringMode, maxScore, scoringConfig ? JSON.stringify(scoringConfig) : null);
+      insertSurvey.run(id, title, description, expiresAt, kind, scoringMode, maxScore, scoringConfig ? JSON.stringify(scoringConfig) : null, selectionMode, sourceGroupId, selectionMode === 'random' ? JSON.stringify({ randomCounts: input.randomCounts || {} }) : null);
       sourceQuestions.forEach((question, index) => {
         // 复制完整值而不是依赖题池外键，这是问卷生成后互不影响的关键。
         insertQuestion.run(
@@ -122,11 +184,62 @@ function createSurveyService(db) {
           question.is_required,
           index,
           question.correct_answer_json,
-          questionPoints.get(question.id)
+          questionPoints.get(question.id),
+          Number(question.is_judgment || 0)
         );
       });
     })();
 
+    return getSurvey(id, true, true);
+  }
+
+  function updateSurvey(id, input = {}) {
+    const current = getSurvey(id, true, true);
+    const responses = Number(current.responseCount || 0);
+    const title = input.title === undefined ? current.title : String(input.title).trim();
+    const description = input.description === undefined ? current.description : String(input.description).trim();
+    const status = input.status === undefined ? current.status : String(input.status);
+    const expiresAt = input.expiresAt === undefined ? current.expiresAt : parseOptionalDate(input.expiresAt);
+    if (!title) throw new HttpError(400, '问卷标题不能为空');
+    if (!['active', 'closed'].includes(status)) throw new HttpError(400, '问卷状态无效');
+    const structuralKeys = ['questionIds', 'selectionMode', 'sourceGroupId', 'randomCounts', 'kind', 'scoringMode', 'totalScore', 'typeWeights', 'questionScores'];
+    const structural = structuralKeys.some((key) => {
+      if (input[key] === undefined) return false;
+      if (key === 'kind') return input[key] !== current.kind;
+      if (key === 'selectionMode') return input[key] !== current.selectionMode;
+      if (key === 'sourceGroupId') return String(input[key] ?? '') !== String(current.sourceGroupId ?? '');
+      if (key === 'questionIds') return JSON.stringify(input[key]) !== JSON.stringify(current.questions.map((question) => question.poolQuestionId));
+      return true;
+    });
+    if (responses && structural) throw new HttpError(409, '已有答卷的实例只能修改基本信息');
+    if (!structural) {
+      db.prepare("UPDATE surveys SET title=?, description=?, status=?, expires_at=?, updated_at=datetime('now') WHERE id=?").run(title, description, status, expiresAt, id);
+      return getSurvey(id, true, true);
+    }
+    const replacement = createSurvey({
+      ...input,
+      title,
+      description,
+      expiresAt,
+      kind: input.kind || current.kind,
+      questionIds: input.questionIds || current.questions.map((question) => question.poolQuestionId),
+      selectionMode: input.selectionMode || current.selectionMode,
+      sourceGroupId: input.sourceGroupId ?? current.sourceGroupId,
+      randomCounts: input.randomCounts || current.selectionConfig?.randomCounts,
+      scoringMode: input.scoringMode || current.scoringMode,
+      totalScore: input.totalScore || current.maxScore,
+      typeWeights: input.typeWeights || current.scoringConfig?.typeWeights,
+      questionScores: input.questionScores || current.scoringConfig?.questionScores
+    });
+    db.transaction(() => {
+      db.prepare('DELETE FROM surveys WHERE id=?').run(id);
+      const old = db.prepare('SELECT * FROM surveys WHERE id=?').get(replacement.id);
+      db.prepare('INSERT INTO surveys(id,title,description,status,expires_at,created_at,updated_at,kind,scoring_mode,max_score,scoring_config_json,selection_mode,source_group_id,selection_config_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id, title, description, status, expiresAt, old.created_at, new Date().toISOString(), old.kind, old.scoring_mode, old.max_score, old.scoring_config_json, old.selection_mode, old.source_group_id, old.selection_config_json);
+      const questions = db.prepare('SELECT * FROM survey_questions WHERE survey_id=?').all(replacement.id);
+      const insert = db.prepare('INSERT INTO survey_questions(survey_id,pool_question_id,title,type,options_json,is_required,sort_order,correct_answer_json,points,is_judgment) VALUES(?,?,?,?,?,?,?,?,?,?)');
+      questions.forEach((question) => insert.run(id, question.pool_question_id, question.title, question.type, question.options_json, question.is_required, question.sort_order, question.correct_answer_json, question.points, question.is_judgment));
+      db.prepare('DELETE FROM surveys WHERE id=?').run(replacement.id);
+    })();
     return getSurvey(id, true, true);
   }
 
@@ -151,7 +264,7 @@ function createSurveyService(db) {
       }
 
       const value = empty ? '' : String(raw).trim();
-      if (question.type === 'single' && value && !question.options.includes(value)) {
+      if ((question.type === 'single' || question.type === 'judgment') && value && !question.options.includes(value)) {
         throw new HttpError(400, `“${question.title}”包含无效选项`);
       }
       if (question.type === 'text' && value.length > 10000) {
@@ -194,6 +307,13 @@ function createSurveyService(db) {
     getSurvey,
     ensureSurveyOpen,
     createSurvey,
+    updateSurvey,
+    listGroups,
+    createGroup,
+    updateGroup,
+    deleteGroup,
+    setQuestionGroups,
+    questionGroupIds,
     validateAnswers,
     saveResponse
   };
@@ -216,7 +336,8 @@ function buildScoring(input, sourceQuestions) {
   if (scoringMode === 'weighted') {
     const maxScore = positiveNumber(input.totalScore, '满分必须大于 0');
     const counts = sourceQuestions.reduce((result, question) => {
-      result[question.type] = (result[question.type] || 0) + 1;
+      const type = question.is_judgment ? 'judgment' : question.type;
+      result[type] = (result[type] || 0) + 1;
       return result;
     }, {});
     const typeWeights = {};
@@ -228,7 +349,7 @@ function buildScoring(input, sourceQuestions) {
 
     const questionPoints = new Map(sourceQuestions.map((question) => [
       question.id,
-      maxScore * typeWeights[question.type] / 100 / counts[question.type]
+      maxScore * typeWeights[question.is_judgment ? 'judgment' : question.type] / 100 / counts[question.is_judgment ? 'judgment' : question.type]
     ]));
     return { scoringMode, maxScore, scoringConfig: { typeWeights, typeCounts: counts }, questionPoints };
   }

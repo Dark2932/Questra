@@ -20,8 +20,13 @@ export const api = {
   createQuestion: (data) => request('/admin/questions', { method: 'POST', body: JSON.stringify(data) }),
   updateQuestion: (id, data) => request(`/admin/questions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteQuestion: (id) => request(`/admin/questions/${id}`, { method: 'DELETE' }),
+  getGroups: () => request('/admin/groups'),
+  createGroup: (data) => request('/admin/groups', { method: 'POST', body: JSON.stringify(data) }),
+  updateGroup: (id, data) => request(`/admin/groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteGroup: (id) => request(`/admin/groups/${id}`, { method: 'DELETE' }),
 
   getSurveys: () => request('/admin/surveys'),
+  getSurvey: (id) => request(`/admin/surveys/${id}`),
   createSurvey: (data) => request('/admin/surveys', { method: 'POST', body: JSON.stringify(data) }),
   updateSurvey: (id, data) => request(`/admin/surveys/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSurvey: (id) => request(`/admin/surveys/${id}`, { method: 'DELETE' }),

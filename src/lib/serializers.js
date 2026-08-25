@@ -13,7 +13,9 @@ function serializeQuestion(row, options = {}) {
     id: row.id,
     poolQuestionId: row.pool_question_id ?? undefined,
     title: row.title,
-    type: row.type,
+    type: row.is_judgment ? 'judgment' : row.type,
+    storageType: row.type,
+    isJudgment: Boolean(row.is_judgment),
     options: parseJson(row.options_json, []),
     required: Boolean(row.is_required),
     points: Number(row.points || 0),
@@ -44,6 +46,9 @@ function serializeSurvey(row, questions) {
     updatedAt: row.updated_at,
     responseCount: row.response_count,
     questionCount: row.question_count,
+    selectionMode: row.selection_mode || 'manual',
+    sourceGroupId: row.source_group_id ?? null,
+    selectionConfig: parseJson(row.selection_config_json, null),
     ...(questions ? { questions } : {})
   };
 }

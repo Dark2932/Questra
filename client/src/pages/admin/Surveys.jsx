@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Table, Tag, Space, Typography, App, Popconfirm } from 'antd';
-import { PlusOutlined, CopyOutlined, EyeOutlined, PauseCircleOutlined, PlayCircleOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, CopyOutlined, EyeOutlined, PauseCircleOutlined, PlayCircleOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import SurveyDialog from './SurveyDialog';
@@ -10,12 +10,14 @@ const { Title, Text } = Typography;
 export default function Surveys() {
   const [surveys, setSurveys] = useState([]);
   const [questions, setQuestions] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const { message } = App.useApp();
 
   const load = useCallback(async () => {
-    try { const [s, q] = await Promise.all([api.getSurveys(), api.getQuestions()]); setSurveys(s); setQuestions(q); }
+    try { const [s, q, g] = await Promise.all([api.getSurveys(), api.getQuestions(), api.getGroups()]); setSurveys(s); setQuestions(q); setGroups(g); }
     catch (e) { message.error(e.message); } finally { setLoading(false); }
   }, [message]);
 
@@ -25,6 +27,7 @@ export default function Surveys() {
   const toggleStatus = async (s) => { try { await api.updateSurvey(s.id, { status: s.status === 'active' ? 'closed' : 'active' }); message.success('问卷状态已更新'); load(); } catch (e) { message.error(e.message); } };
   const deleteSurvey = async (id) => { try { await api.deleteSurvey(id); message.success('问卷已删除'); load(); } catch (e) { message.error(e.message); } };
   const handleCreate = async (payload) => { try { await api.createSurvey(payload); message.success('问卷已生成'); setDialogOpen(false); load(); } catch (e) { message.error(e.message); } };
+  const handleSave = async (payload) => { try { if (editing) await api.updateSurvey(editing.id, payload); else await api.createSurvey(payload); message.success(editing ? '实例已更新' : '问卷已生成'); setDialogOpen(false); setEditing(null); load(); } catch (e) { message.error(e.message); } };
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
@@ -63,6 +66,7 @@ export default function Surveys() {
             { title: '', width: 240, render: (_, r) => (
               <Space wrap size={8}>
                 <Button size="small" icon={<CopyOutlined />} onClick={() => copyLink(r.id)}>链接</Button>
+                <Button size="small" icon={<EditOutlined />} onClick={async () => { try { setEditing(await api.getSurvey(r.id)); setDialogOpen(true); } catch (e) { message.error(e.message); } }}>编辑</Button>
                 <Link to={`/admin/surveys/${r.id}/responses`}><Button size="small" icon={<EyeOutlined />}>数据</Button></Link>
                 <Button size="small" icon={r.status === 'active' ? <PauseCircleOutlined /> : <PlayCircleOutlined />} onClick={() => toggleStatus(r)}>
                   {r.status === 'active' ? '关闭' : '开启'}
@@ -75,7 +79,7 @@ export default function Surveys() {
           ]}
         />
       </Card>
-      <SurveyDialog open={dialogOpen} onClose={() => setDialogOpen(false)} questions={questions} onSubmit={handleCreate} />
+      <SurveyDialog open={dialogOpen} onClose={() => { setDialogOpen(false); setEditing(null); }} questions={questions} groups={groups} editing={editing} onSubmit={handleSave} />
     </Space>
   );
 }

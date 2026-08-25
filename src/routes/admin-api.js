@@ -34,30 +34,37 @@ function createAdminApi({ db, surveyService }) {
 
   router.get('/questions', (req, res) => {
     const rows = db.prepare('SELECT * FROM question_pool ORDER BY updated_at DESC, id DESC').all();
-    res.json(rows.map((row) => serializeQuestion(row, { includeAnswer: true })));
+    res.json(rows.map((row) => ({ ...serializeQuestion(row, { includeAnswer: true }), groupIds: surveyService.questionGroupIds(row.id) })));
   });
+
+  router.get('/groups', (req, res) => res.json(surveyService.listGroups()));
+  router.post('/groups', (req, res) => res.status(201).json(surveyService.createGroup(req.body)));
+  router.put('/groups/:id', (req, res) => res.json(surveyService.updateGroup(req.params.id, req.body)));
+  router.delete('/groups/:id', (req, res) => { surveyService.deleteGroup(req.params.id); res.status(204).end(); });
 
   router.post('/questions', (req, res) => {
     const question = surveyService.normalizeQuestion(req.body);
     const result = db.prepare(`
-      INSERT INTO question_pool (title, type, options_json, is_required, correct_answer_json) VALUES (?, ?, ?, ?, ?)
+      INSERT INTO question_pool (title, type, options_json, is_required, correct_answer_json, is_judgment) VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       question.title,
       question.type,
       JSON.stringify(question.options),
       Number(question.required),
-      question.correctAnswer === null ? null : JSON.stringify(question.correctAnswer)
+      question.correctAnswer === null ? null : JSON.stringify(question.correctAnswer),
+      Number(question.isJudgment)
     );
-    res.status(201).json(serializeQuestion(
+    if (req.body.groupIds) surveyService.setQuestionGroups(result.lastInsertRowid, req.body.groupIds);
+    res.status(201).json({ ...serializeQuestion(
       db.prepare('SELECT * FROM question_pool WHERE id = ?').get(result.lastInsertRowid),
       { includeAnswer: true }
-    ));
+    ), groupIds: surveyService.questionGroupIds(result.lastInsertRowid) });
   });
 
   router.put('/questions/:id', (req, res) => {
     const question = surveyService.normalizeQuestion(req.body);
     const result = db.prepare(`
-      UPDATE question_pool SET title = ?, type = ?, options_json = ?, is_required = ?, correct_answer_json = ?, updated_at = datetime('now')
+      UPDATE question_pool SET title = ?, type = ?, options_json = ?, is_required = ?, correct_answer_json = ?, is_judgment = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       question.title,
@@ -65,10 +72,12 @@ function createAdminApi({ db, surveyService }) {
       JSON.stringify(question.options),
       Number(question.required),
       question.correctAnswer === null ? null : JSON.stringify(question.correctAnswer),
+      Number(question.isJudgment),
       req.params.id
     );
     if (!result.changes) throw new HttpError(404, '题目不存在');
-    res.json(serializeQuestion(db.prepare('SELECT * FROM question_pool WHERE id = ?').get(req.params.id), { includeAnswer: true }));
+    if (req.body.groupIds) surveyService.setQuestionGroups(req.params.id, req.body.groupIds);
+    res.json({ ...serializeQuestion(db.prepare('SELECT * FROM question_pool WHERE id = ?').get(req.params.id), { includeAnswer: true }), groupIds: surveyService.questionGroupIds(req.params.id) });
   });
 
   router.delete('/questions/:id', (req, res) => {
@@ -96,20 +105,7 @@ function createAdminApi({ db, surveyService }) {
   });
 
   router.put('/surveys/:id', (req, res) => {
-    const current = surveyService.getSurvey(req.params.id, false);
-    const title = req.body.title === undefined ? current.title : String(req.body.title).trim();
-    const description = req.body.description === undefined ? current.description : String(req.body.description).trim();
-    const status = req.body.status === undefined ? current.status : String(req.body.status);
-    const expiresAt = req.body.expiresAt === undefined
-      ? current.expiresAt
-      : surveyService.parseOptionalDate(req.body.expiresAt);
-    if (!title) throw new HttpError(400, '问卷标题不能为空');
-    if (!['active', 'closed'].includes(status)) throw new HttpError(400, '问卷状态无效');
-
-    db.prepare(`
-      UPDATE surveys SET title = ?, description = ?, status = ?, expires_at = ?, updated_at = datetime('now') WHERE id = ?
-    `).run(title, description, status, expiresAt, req.params.id);
-    res.json(surveyService.getSurvey(req.params.id, true, true));
+    res.json(surveyService.updateSurvey(req.params.id, req.body));
   });
 
   router.delete('/surveys/:id', (req, res) => {
