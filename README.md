@@ -11,7 +11,7 @@ npm run build:client
 npm start
 ```
 
-启动后终端会打印本次运行随机生成的 Admin Token 和完整管理地址。直接打开该地址即可进入管理端。也可以固定环境变量 `QUESTRA_ADMIN_TOKEN`，便于反向代理或进程守护器长期使用。
+启动后终端会打印 Admin Token 和完整管理地址。Token 会持久化到数据目录下的 `.admin-token` 文件（0600 权限），**服务重启后保持不变**，`npm run dev`（自动重载）期间也不需要重新授权。需要更换 Token 时删除该文件，或设置环境变量 `QUESTRA_ADMIN_TOKEN` 固定使用。直接打开管理地址即可进入管理端；若浏览器提示需要授权，可在授权页直接粘贴最新 Token 恢复，或使用带 `?token=` 参数的管理链接。
 
 作为 npm 包使用时，可在包含 `survey.config.js` 的目录运行：
 

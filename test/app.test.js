@@ -159,6 +159,33 @@ test('考试权重计分、答案保密和逐题分值模式', async (t) => {
   assert.deepEqual(perQuestionExam.questions.map((question) => question.points), [5, 15]);
 });
 
+test('Admin Token 持久化：重启复用、环境变量优先', async (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-token-'));
+  const databasePath = path.join(tempDir, 'data', 'questra.db');
+  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
+
+  const { loadOrCreateAdminToken } = require('../src/admin-token');
+
+  const first = loadOrCreateAdminToken({ database: databasePath });
+  assert.equal(typeof first, 'string');
+  assert.ok(first.length >= 32);
+  assert.ok(fs.existsSync(path.join(tempDir, 'data', '.admin-token')));
+
+  // 模拟重启：再次调用应返回同一 Token。
+  const second = loadOrCreateAdminToken({ database: databasePath });
+  assert.equal(second, first);
+
+  // 环境变量优先于文件。
+  const fromEnv = loadOrCreateAdminToken({ database: databasePath, envToken: 'fixed-env-token' });
+  assert.equal(fromEnv, 'fixed-env-token');
+
+  // 删除文件后可再生成新 Token。
+  fs.rmSync(path.join(tempDir, 'data', '.admin-token'));
+  const regenerated = loadOrCreateAdminToken({ database: databasePath });
+  assert.notEqual(regenerated, first);
+  assert.ok(fs.existsSync(path.join(tempDir, 'data', '.admin-token')));
+});
+
 test('健康检查与提交限流', async (t) => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-limit-'));
   const db = openDatabase(path.join(tempDir, 'test.db'));

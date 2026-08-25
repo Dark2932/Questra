@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useCallback, useMemo } from 'react';
 import { ConfigProvider, App as AntApp, theme as antTheme } from 'antd';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import zhCN from 'antd/locale/zh_CN';
 import { useTheme } from './hooks/useTheme';
 import AdminLayout from './components/layout/AdminLayout';
@@ -40,22 +40,18 @@ function Page({ children }) {
 }
 
 function AnimatedRoutes({ token, handleLogout, theme, resolvedTheme, setTheme }) {
-  const location = useLocation();
-
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/admin" element={<AdminLayout token={token} onLogout={handleLogout} theme={theme} resolvedTheme={resolvedTheme} onThemeChange={setTheme} />}>
-          <Route index element={<Page><Dashboard /></Page>} />
-          <Route path="questions" element={<Page><Questions /></Page>} />
-          <Route path="surveys" element={<Page><Surveys /></Page>} />
-          <Route path="surveys/:id/responses" element={<Page><Responses /></Page>} />
-        </Route>
-        <Route path="/s/:id" element={<Page><Survey /></Page>} />
-        <Route path="/unauthorized" element={<Page><Unauthorized /></Page>} />
-        <Route path="*" element={<Navigate to="/admin" replace />} />
-      </Routes>
-    </AnimatePresence>
+    <Routes>
+      <Route path="/admin" element={<AdminLayout token={token} onLogout={handleLogout} theme={theme} resolvedTheme={resolvedTheme} onThemeChange={setTheme} />}>
+        <Route index element={<Dashboard />} />
+        <Route path="questions" element={<Questions />} />
+        <Route path="surveys" element={<Surveys />} />
+        <Route path="surveys/:id/responses" element={<Responses />} />
+      </Route>
+      <Route path="/s/:id" element={<Page><Survey /></Page>} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
+      <Route path="*" element={<Navigate to="/admin" replace />} />
+    </Routes>
   );
 }
 

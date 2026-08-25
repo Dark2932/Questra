@@ -5,8 +5,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Command } = require('commander');
-const { randomUUID } = require('node:crypto');
 const { loadConfig } = require('../src/config');
+const { loadOrCreateAdminToken } = require('../src/admin-token');
 const { openDatabase, migrate } = require('../src/db');
 const { createApp } = require('../src/app');
 
@@ -27,7 +27,7 @@ program
     const config = loadConfig(options.config);
     const port = Number(options.port || process.env.PORT || config.port || 3000);
     const host = options.host || process.env.HOST || config.host || '0.0.0.0';
-    const adminToken = process.env.QUESTRA_ADMIN_TOKEN || randomUUID();
+    const adminToken = loadOrCreateAdminToken({ database: config.database });
     const db = openDatabase(config.database);
 
     migrate(db);
@@ -38,7 +38,8 @@ program
       console.log(`访问地址: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
       console.log(`管理地址: http://localhost:${port}/admin?token=${adminToken}`);
       console.log(`Admin Token: ${adminToken}`);
-      console.log('请妥善保存 Token；服务重启后会重新生成。');
+      console.log('Token 已持久化到数据目录 .admin-token 文件，重启后保持不变。');
+      console.log('需要更换 Token 时删除该文件，或设置环境变量 QUESTRA_ADMIN_TOKEN。');
       console.log('');
     });
 

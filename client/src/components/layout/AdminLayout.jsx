@@ -1,6 +1,7 @@
-import { Outlet, useNavigate, Link } from 'react-router-dom';
+import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
 import { Layout, Menu, Space, Typography, Segmented } from 'antd';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   DashboardOutlined,
   FormOutlined,
@@ -15,6 +16,7 @@ const { Header, Content } = Layout;
 
 export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onThemeChange }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const verified = useRef(false);
 
   useEffect(() => {
@@ -105,7 +107,17 @@ export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onT
       </Header>
 
       <Content style={{ padding: 24, maxWidth: 1200, width: '100%', marginInline: 'auto' }}>
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </Content>
     </Layout>
   );
