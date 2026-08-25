@@ -2,20 +2,30 @@
   "name": "questra",
   "version": "0.2.0",
   "description": "面向个人开发者的轻量级自托管问卷框架",
+  "author": "Dark2932",
   "type": "commonjs",
   "main": "src/app.js",
   "bin": {
     "questra": "bin/questra.js"
   },
   "files": [
-    "bin",
-    "src",
-    "views",
-    "public",
-    "migrations",
-    "client/dist",
+    "docs",
+    "bin/questra.js",
+    "src/**/*.js",
+    "views/**/*.ejs",
+    "public/**/*",
+    "migrations/**/*.sql",
+    "client/dist/**/*",
     "survey.config.example.js"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dark2932/Questra.git"
+  },
+  "homepage": "https://github.com/Dark2932/Questra#readme",
+  "bugs": {
+    "url": "https://github.com/Dark2932/Questra/issues"
+  },
   "scripts": {
     "start": "node bin/questra.js start",
     "migrate": "node bin/questra.js migrate",
@@ -32,10 +42,13 @@
     "dev:all": "concurrently -k -n server,client \"node --watch bin/questra.js start --foreground\" \"npm run dev --prefix client\"",
     "check:repo": "node scripts/check-repository.js",
     "check": "npm run check:repo && npm run lint && npm test && npm run lint:client && npm run test:client",
+    "release:check": "npm run check && npm pack --dry-run",
+    "prepublishOnly": "npm run check",
     "prepack": "node scripts/build-client.js --prepack"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "npm": ">=10"
   },
   "keywords": [
     "survey",
