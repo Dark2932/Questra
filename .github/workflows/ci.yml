@@ -16,6 +16,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run check:repo
       - run: npm run lint
       - run: npm test
 
@@ -31,11 +32,11 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci
         working-directory: client
-      - run: npm run build
-        working-directory: client
       - run: npm run lint
         working-directory: client
       - run: npm test
+        working-directory: client
+      - run: npm run build
         working-directory: client
 
   pack:
@@ -47,7 +48,5 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: npm ci
-        working-directory: client
       - run: npm pack --dry-run
       - run: node -e "const p=require('./package.json');const f=p.files||[];if(!f.includes('client/dist')){console.error('files 缺少 client/dist');process.exit(1)}else{console.log('✓ client/dist 已包含在发布包中')}"

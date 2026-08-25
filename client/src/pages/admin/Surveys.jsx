@@ -26,7 +26,6 @@ export default function Surveys() {
   const copyLink = async (id) => { await navigator.clipboard.writeText(`${window.location.origin}/s/${id}`); message.success('公开链接已复制'); };
   const toggleStatus = async (s) => { try { await api.updateSurvey(s.id, { status: s.status === 'active' ? 'closed' : 'active' }); message.success('问卷状态已更新'); load(); } catch (e) { message.error(e.message); } };
   const deleteSurvey = async (id) => { try { await api.deleteSurvey(id); message.success('问卷已删除'); load(); } catch (e) { message.error(e.message); } };
-  const handleCreate = async (payload) => { try { await api.createSurvey(payload); message.success('问卷已生成'); setDialogOpen(false); load(); } catch (e) { message.error(e.message); } };
   const handleSave = async (payload) => { try { if (editing) await api.updateSurvey(editing.id, payload); else await api.createSurvey(payload); message.success(editing ? '实例已更新' : '问卷已生成'); setDialogOpen(false); setEditing(null); load(); } catch (e) { message.error(e.message); } };
 
   return (

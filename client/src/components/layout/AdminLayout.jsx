@@ -1,7 +1,7 @@
-import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useNavigate, Link, useLocation, useOutlet } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Layout, Menu, Space, Typography, Segmented } from 'antd';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   DashboardOutlined,
   FormOutlined,
@@ -17,7 +17,27 @@ const { Header, Content } = Layout;
 export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onThemeChange }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const outlet = useOutlet();
   const verified = useRef(false);
+  const previousPath = useRef(location.pathname);
+  const revealTimer = useRef(null);
+  const pendingOutlet = useRef(outlet);
+  const [displayedOutlet, setDisplayedOutlet] = useState(outlet);
+  const [transitionPhase, setTransitionPhase] = useState(null);
+  pendingOutlet.current = outlet;
+
+  useLayoutEffect(() => {
+    if (previousPath.current === location.pathname) return undefined;
+    previousPath.current = location.pathname;
+    setTransitionPhase('cover');
+    revealTimer.current = window.setTimeout(() => {
+      setDisplayedOutlet(pendingOutlet.current);
+      setTransitionPhase('reveal');
+    }, 260);
+    return () => window.clearTimeout(revealTimer.current);
+  }, [location.pathname]);
+
+  useEffect(() => () => window.clearTimeout(revealTimer.current), []);
 
   useEffect(() => {
     if (!token) {
@@ -107,18 +127,33 @@ export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onT
       </Header>
 
       <Content style={{ padding: 24, maxWidth: 1200, width: '100%', marginInline: 'auto' }}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.28, ease: 'easeOut' }}
+        >
+          {displayedOutlet}
+        </motion.div>
       </Content>
+      {transitionPhase && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: transitionPhase === 'cover' ? 1 : 0 }}
+          transition={{ duration: transitionPhase === 'cover' ? 0.26 : 0.34, ease: 'easeInOut' }}
+          onAnimationComplete={() => {
+            if (transitionPhase === 'reveal') setTransitionPhase(null);
+          }}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: '#000',
+            pointerEvents: 'all',
+          }}
+        />
+      )}
     </Layout>
   );
 }

@@ -9,6 +9,7 @@ const path = require('node:path');
  * @property {string} [host]
  * @property {string} [database]
  * @property {string} [siteName]
+ * @property {boolean} [logging] 是否将 HTTP 请求日志输出到运行终端，默认 true
  * @property {{beforeSubmit?: Function, afterSubmit?: Function}} [hooks]
  */
 
@@ -27,6 +28,7 @@ function loadConfig(configPath) {
     port: 3000,
     host: '0.0.0.0',
     siteName: 'Questra',
+    logging: true,
     ...userConfig,
     // 相对数据库路径始终以进程启动目录为基准，而不是 npm 包目录。
     database: path.resolve(process.cwd(), database),

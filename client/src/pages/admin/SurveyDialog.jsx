@@ -29,7 +29,10 @@ export default function SurveyDialog({ open, onClose, questions, groups = [], ed
         else { payload.questionScores = {}; selectedQuestions.forEach((question) => { payload.questionScores[question.id] = values.questionScores?.[question.id] || 1; }); }
       }
       await onSubmit(payload);
-    } catch {}
+    } catch (error) {
+      // Ant Design rejects validation failures so the dialog remains open.
+      if (!error?.errorFields) throw error;
+    }
   };
   return <Modal open={open} title={editing ? '编辑实例' : '生成问卷或考试'} onCancel={onClose} onOk={submit} okText="保存" cancelText="取消" destroyOnHidden width={680}>
     <Form form={form} layout="vertical"><Form.Item name="kind" label="实例类型"><Select onChange={setKind} options={[{ value: 'survey', label: '普通问卷' }, { value: 'exam', label: '考试 / 答题' }]} /></Form.Item><Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item><Form.Item name="description" label="说明"><TextArea rows={2} /></Form.Item><Form.Item name="expiresAt" label="截止时间"><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="selectionMode" label="选题方式"><Radio.Group onChange={(e) => setMode(e.target.value)} options={[{ value: 'manual', label: '手动选择' }, { value: 'random', label: '随机抽取' }]} /></Form.Item>

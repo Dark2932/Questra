@@ -1,8 +1,59 @@
+# Dependencies
 node_modules/
-data/
+
+# Local configuration and secrets
+/survey.config.js
 .env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Runtime data and local backups
+/data/
+/backup/
+/backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+.admin-token
+/.questra/
+
+# Generated output and test reports
+/client/dist/
+/dist/
+/build/
+/coverage/
+/.nyc_output/
+*.tsbuildinfo
+
+# Logs and temporary files
 *.log
-coverage/
-client/node_modules/
-client/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tmp
+*.temp
+*.swp
+*.swo
+/.cache/
+/.tmp/
+/tmp/
+/temp/
+
+# Editors and operating systems
+/.idea/
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/settings.example.json
+.DS_Store
+Thumbs.db
+Desktop.ini
 

@@ -26,6 +26,19 @@ function createApp({ db, config, adminToken }) {
   app.set('views', path.join(__dirname, '..', 'views'));
   app.locals.siteName = config.siteName;
   app.use(securityHeaders);
+  // 轻量请求日志直接输出到启动 Questra 的终端，便于个人服务器调试。
+  if (config.logging !== false) {
+    app.use((req, res, next) => {
+      const startedAt = process.hrtime.bigint();
+      res.once('finish', () => {
+        const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        const status = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
+        const safeUrl = req.originalUrl.replace(/([?&]token=)[^&]*/gi, '$1[redacted]');
+        console.log(`[${status}] ${new Date().toISOString()} ${req.method} ${safeUrl} ${res.statusCode} ${elapsedMs.toFixed(1)}ms`);
+      });
+      next();
+    });
+  }
   app.use(express.json({ limit: '256kb' }));
   app.use(express.urlencoded({ extended: false, limit: '256kb' }));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));

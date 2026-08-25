@@ -5,6 +5,8 @@ module.exports = {
   host: '0.0.0.0',
   database: './data/questra.db',
   siteName: '我的问卷',
+  // 是否将每次 HTTP 请求打印到运行 Questra 的终端，默认开启。
+  logging: true,
   hooks: {
     async beforeSubmit(answerData) {
       const webhook = process.env.DINGTALK_WEBHOOK_URL;
