@@ -1031,6 +1031,11 @@ tail -n 100 ~/.questra/questra.log
 
 确认使用的是当前数据库目录下的 `.admin-token` 对应 Token，或检查 `QUESTRA_ADMIN_TOKEN` 是否覆盖了文件中的 Token。不要只看旧日志；后台启动会持续追加日志。
 
+### GitHub Actions 版本或发布失败
+
+- `fatal: empty ident name`：版本号被手动修改时，版本 job 仍需创建 annotated tag。Runner 没有默认 Git 身份；当前工作流会在版本判断前配置 `github-actions[bot]`，推送修复后的工作流后重新运行即可。
+- `npm error code ENEEDAUTH`：Release 已触发 `publish.yaml`，但 npm 未接受 OIDC 身份。请在 npm 包的 **Trusted Publishers** 中绑定仓库 `Dark2932/Questra` 和工作流文件 `publish.yaml`，并确认 job 保留 `id-token: write` 权限；绑定后可在 Actions 中手动补跑对应标签。
+
 ### 数据库打不开或迁移失败
 
 检查安装目录、`QUESTRA_DATA_DIR`、数据库路径和文件权限。Linux/macOS 全局 npm 目录可能不可写；此时应把 `QUESTRA_DATA_DIR` 指向服务账号可写的持久化目录。先备份现有数据库，再处理迁移；不要为了“重新开始”直接删除生产数据库。

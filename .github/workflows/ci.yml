@@ -58,6 +58,10 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Runner 默认没有 Git 身份；无论是自动提交还是 annotated tag 都需要它。
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           CURRENT_VERSION="$(node -p "require('./package.json').version")"
           PREVIOUS_VERSION="$(git show HEAD^:package.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).version))")"
 
@@ -74,8 +78,6 @@ jobs:
           if [[ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]]; then
             npm version patch --no-git-tag-version
             VERSION="$(node -p "require('./package.json').version")"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add package.json
             git commit -m "chore: bump Questra version to ${VERSION} [skip ci]"
             PUSH_BRANCH=true
