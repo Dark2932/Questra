@@ -30,25 +30,24 @@
     "start": "node bin/questra.js start",
     "migrate": "node bin/questra.js migrate",
     "dev": "node --watch bin/questra.js start --foreground",
-    "test": "node --test \"test/*.test.js\"",
-    "test:client": "npm test --prefix client",
+    "test": "node --test test",
+    "test:client": "node scripts/run-client.js test",
     "lint": "eslint src bin scripts test",
-    "lint:client": "npm run lint --prefix client",
+    "lint:client": "node scripts/run-client.js lint",
     "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\"",
-    "install:client": "npm ci --prefix client",
-    "build": "npm run build:client",
+    "install:client": "node scripts/run-client.js install",
+    "build": "node scripts/build-client.js",
     "build:client": "node scripts/build-client.js",
-    "dev:client": "npm run dev --prefix client",
-    "dev:all": "concurrently -k -n server,client \"node --watch bin/questra.js start --foreground\" \"npm run dev --prefix client\"",
+    "dev:client": "node scripts/run-client.js dev",
+    "dev:all": "concurrently -k -n server,client \"node --watch bin/questra.js start --foreground\" \"node scripts/run-client.js dev\"",
     "check:repo": "node scripts/check-repository.js",
-    "check": "npm run check:repo && npm run lint && npm test && npm run lint:client && npm run test:client",
-    "release:check": "npm run check && npm pack --dry-run",
-    "prepublishOnly": "npm run check",
+    "check": "node scripts/run-scripts.js check:repo lint test lint:client test:client",
+    "release:check": "node scripts/run-scripts.js check && node scripts/run-package-manager.js pack --dry-run",
+    "prepublishOnly": "node scripts/run-scripts.js check",
     "prepack": "node scripts/build-client.js --prepack"
   },
   "engines": {
-    "node": ">=20",
-    "npm": ">=10"
+    "node": ">=20"
   },
   "keywords": [
     "survey",
@@ -58,7 +57,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^12.2.0",
+    "better-sqlite3": "12.2.0",
     "commander": "^14.0.0",
     "ejs": "^3.1.10",
     "express": "^5.1.0"

@@ -9,7 +9,7 @@ function createPublicRoutes({ config, surveyService, submitLimiter }) {
   router.get('/api/surveys/:id', (req, res) => {
     const survey = surveyService.getSurvey(req.params.id);
     surveyService.ensureSurveyOpen(survey);
-    res.json(survey);
+    res.json({ ...survey, siteName: config.siteName, siteIcon: config.siteIcon || '' });
   });
 
   // HTTP/1 代理场景：限制单 IP 提交频率，降低恶意灌数据风险。

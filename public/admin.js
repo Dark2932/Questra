@@ -71,7 +71,7 @@ async function initQuestions() {
 
   function render() {
     if (!questions.length) {
-      list.innerHTML = '<div class="empty-state"><strong>问题池还是空的</strong><span>添加第一道题目后即可生成问卷。</span></div>';
+      list.innerHTML = '<div class="empty-state"><strong>题库还是空的</strong><span>添加第一道题目后即可生成问卷。</span></div>';
       return;
     }
     const labels = { single: '单选', multiple: '多选', text: '文本' };
@@ -166,7 +166,7 @@ async function initSurveys() {
 
   function render() {
     if (!surveys.length) {
-      list.innerHTML = '<div class="empty-state"><strong>还没有问卷</strong><span>从问题池选择题目，生成第一份问卷。</span></div>';
+      list.innerHTML = '<div class="empty-state"><strong>还没有问卷</strong><span>从题库选择题目，生成第一份问卷。</span></div>';
       return;
     }
     list.innerHTML = `<table><thead><tr><th>实例</th><th>类型</th><th>状态</th><th>题目</th><th>提交</th><th>截止时间</th><th>操作</th></tr></thead><tbody>${surveys.map((survey) => `
@@ -178,7 +178,7 @@ async function initSurveys() {
       <div class="choice-item scored-choice" data-question-type="${question.type}">
         <label class="check-row"><input type="checkbox" name="questionIds" value="${question.id}"><span><strong>${escapeHtml(question.title)}</strong><small>${typeLabels[question.type]} · ${question.required ? '必填' : '选填'} · ${question.correctAnswer === null ? '<b class="answer-missing">未设答案</b>' : '<b class="answer-ready">已设答案</b>'}</small></span></label>
         <label class="question-score" hidden><input type="number" min="0.01" step="0.01" data-question-score="${question.id}" placeholder="分值"><span>分</span></label>
-      </div>`).join('') : '<p class="empty-note">问题池为空，请先添加题目。</p>';
+      </div>`).join('') : '<p class="empty-note">题库为空，请先添加题目。</p>';
   }
 
   function selectedQuestions() {

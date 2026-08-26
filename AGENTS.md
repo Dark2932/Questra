@@ -24,6 +24,13 @@
 - 涉及路径、命令、权限或进程管理时，同时考虑 Windows、Linux、macOS 的 Shell 语法和运行差异。
 - 使用 `apply_patch` 编辑文件；避免无关格式化、批量重命名和元数据噪声。
 
+### 包管理约定
+
+- 本地开发推荐使用 `pnpm`，但项目脚本必须同时兼容 `pnpm run <script>` 和 `npm run <script>`；不要把某个包管理器硬编码进通用脚本。
+- 根目录的 `pnpm-lock.yaml` 是 CI 和仓库的依赖基线。npm 开发者可以在本地安装和运行，生成的 `package-lock.json`、`npm-shrinkwrap.json` 或 `yarn.lock` 不提交。
+- 修改依赖后用 pnpm 同步更新 `pnpm-lock.yaml`；只修改业务代码时不应产生锁文件变化。
+- 面向最终用户的 `npm install -g questra` 可以保留；`npm login`、`npm whoami` 和 `npm publish` 仅用于 npm Registry 登录与发布。文档中应明确这些命令不属于仓库开发流程。
+
 ## 3. 文档同步
 
 1. 行为发生变化时，用 `rg -n` 检索全部 Markdown、示例配置和帮助文案中的旧名称、旧路径、旧命令，更新所有受影响位置。
@@ -34,9 +41,9 @@
 ## 4. 按风险验证
 
 - 小范围文案或样式改动：运行相关前端检查，并执行 `git diff --check`。
-- 后端逻辑、API、CLI 或数据库改动：先运行直接相关测试、Lint，再视影响范围运行 `npm run check`。
-- 前端生产行为改动：在相关测试和 Lint 后运行 `npm run build`。
-- 修改 README、`package.json#files`、构建或发布流程：运行 `npm pack --dry-run` 或 `npm run release:check`，确认没有测试源码、数据库、Token、日志或依赖目录进入发布包。
+- 后端逻辑、API、CLI 或数据库改动：先运行直接相关测试、Lint，再视影响范围运行 `pnpm run check` 或 `npm run check`。
+- 前端生产行为改动：在相关测试和 Lint 后运行 `pnpm run build` 或 `npm run build`。
+- 修改 README、`package.json#files`、构建或发布流程：运行 `pnpm run release:check` 或 `npm run release:check`，确认没有测试源码、数据库、Token、日志或依赖目录进入发布包。
 - 数据库迁移：用临时数据库验证从空库和已有库升级，并确认 WAL、备份及权限行为。
 - 无法运行某项检查时，说明原因、未覆盖的风险和建议的后续命令；不要把未运行写成已通过。
 

@@ -5,16 +5,28 @@ async function request(path, options = {}) {
   const headers = { 'content-type': 'application/json', ...options.headers };
   if (token) headers.authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API}${path}`, { ...options, headers });
+  const res = await fetch(`${API}${path}`, { ...options, headers, credentials: 'same-origin' });
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(data.error || `请求失败 (${res.status})`);
+    error.status = res.status;
+    throw error;
+  }
   return data;
 }
 
 export const api = {
   getConfig: () => request('/config'),
+  getSetupStatus: () => request('/setup/status'),
+  setup: (data) => request('/setup', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  me: () => request('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
   getDashboard: () => request('/admin/dashboard'),
+  getSettings: () => request('/admin/settings'),
+  updateSiteSettings: (data) => request('/admin/settings/site', { method: 'PUT', body: JSON.stringify(data) }),
+  updateAccountSettings: (data) => request('/admin/settings/account', { method: 'PUT', body: JSON.stringify(data) }),
 
   getQuestions: () => request('/admin/questions'),
   createQuestion: (data) => request('/admin/questions', { method: 'POST', body: JSON.stringify(data) }),
@@ -35,6 +47,7 @@ export const api = {
     const token = sessionStorage.getItem('questra_admin_token') || '';
     const res = await fetch(`${API}/admin/surveys/${id}/export?format=${format}`, {
       headers: token ? { authorization: `Bearer ${token}` } : {},
+      credentials: 'same-origin',
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));

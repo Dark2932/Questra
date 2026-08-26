@@ -51,16 +51,17 @@ questra start --config C:\Questra\production\survey.config.js
 
 1. 在 Questra 安装根目录的 `data/questra.db` 创建 SQLite 数据库（不会写入当前执行目录）。
 2. 执行尚未应用的数据库迁移。
-3. 创建并保存 Admin Token。
+3. 准备首次初始化页面，并创建兼容旧版本的 Admin Token。
 4. 在后台监听 `http://localhost:3000`。
 
-终端会显示管理地址，例如：
+浏览器打开以下地址：
 
 ```text
-http://localhost:3000/admin?token=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+http://localhost:3000/admin
 ```
 
-复制完整地址到浏览器即可进入管理后台。Token 默认保存在 `data/.admin-token`，服务重启后仍然有效。
+首次访问会进入欢迎页并要求创建管理员账号密码。终端仍会打印带 Token 的兼容管理地址，
+用于旧版本升级和忘记密码时的恢复；Token 默认保存在数据库目录的 `.admin-token`。
 
 常用管理命令：
 
@@ -92,7 +93,7 @@ questra start --port 8080
 
 ### 1. 进入管理后台
 
-打开启动时显示的管理地址。管理后台包含仪表盘、题库、问卷和答卷页面。
+打开启动时显示的管理地址。首次访问会进入欢迎页和初始化向导：创建唯一的管理员账号、密码和昵称，并设置站点名称。初始化完成后使用账号密码登录，管理后台包含仪表盘、题库、问卷和答卷页面。
 
 如果没有保存管理地址，可以查看日志：
 
@@ -106,7 +107,7 @@ Linux / macOS：
 tail -n 30 ~/.questra/questra.log
 ```
 
-也可以在浏览器中打开 `/admin`，然后粘贴 Admin Token。
+也可以在浏览器中打开 `/admin`，使用初始化时设置的账号密码登录。旧版本的 Admin Token 链接仍然兼容。
 
 ### 2. 创建题目
 
@@ -195,7 +196,8 @@ Windows 的配置路径可以是 `C:\Questra\production\survey.config.js`；Linu
 
 ### 认证和安全
 
-管理 API 支持 `Authorization: Bearer <token>` 和 `x-admin-token`。也可以使用 `/admin?token=<token>` 首次进入。生产环境建议：
+后台日常使用账号密码和 7 天有效的 HttpOnly 会话 Cookie。管理 API 继续支持
+`Authorization: Bearer <token>` 和 `x-admin-token`，也可以使用 `/admin?token=<token>` 恢复访问。生产环境建议：
 
 - 设置 `QUESTRA_ADMIN_TOKEN`，由密钥管理系统提供固定 Token
 - 使用 Caddy 或 Nginx 提供 HTTPS
@@ -209,7 +211,7 @@ Windows 的配置路径可以是 `C:\Questra\production\survey.config.js`；Linu
 
 Questra 的扩展点是 `survey.config.js` 中的 `beforeSubmit` 和 `afterSubmit`：前者在入库前执行，抛出错误会拒绝提交；后者在入库成功后执行，失败只记录日志，不会回滚答卷。
 
-从源码开发、编写 Webhook 插件、调用 REST API、配置 systemd / PM2、运行测试和发布 npm 包，请阅读 [深入部署与开发指南](docs/guide.md)。
+仓库开发推荐使用 pnpm，同时兼容 npm；项目脚本会自动沿用当前调用者使用的包管理器。面向普通用户的全局安装仍使用前文的 npm 命令。从源码开发、编写 Webhook 插件、调用 REST API、配置 systemd / PM2、运行测试和发布 npm 包，请阅读 [深入部署与开发指南](docs/guide.md)。
 
 ### 许可证
 

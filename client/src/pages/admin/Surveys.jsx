@@ -52,7 +52,7 @@ export default function Surveys() {
                   <Tag color={r.status === 'active' ? 'green' : 'default'}>{r.status === 'active' ? '回收中' : '已关闭'}</Tag>
                 </Space>
                 <div style={{ fontWeight: 600 }}>{t}</div>
-                {r.description && <Text type="secondary" style={{ fontSize: 12 }} ellipsis>{r.description}</Text>}
+                {r.description && <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{r.description}</Text>}
               </div>
             )},
             { title: '信息', width: 200, render: (_, r) => (

@@ -77,7 +77,7 @@ export default function Responses() {
           scroll={{ x: true }}
           columns={[
             { title: '提交时间', dataIndex: 'submittedAt', width: 180 },
-            ...survey.questions.map((q) => ({ title: q.title, key: q.id, ellipsis: true, width: 160,
+            ...survey.questions.map((q) => ({ title: q.title, key: q.id, width: 160,
               render: (_, r) => { const ans = r.answers[q.id]; return ans ? formatAnswer(ans.value) : '\u2014'; } })),
             ...(survey.kind === 'exam' ? [{ title: '得分', width: 100,
               render: (_, r) => r.score != null ? <Text strong>{r.score} / {r.maxScore}</Text> : '\u2014' }] : []),

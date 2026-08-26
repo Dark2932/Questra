@@ -24,6 +24,7 @@ const forbidden = tracked.filter((file) => {
   const basename = normalized.split('/').at(-1);
   const isEnvExample = /^\.env(?:\..+)?\.example$/.test(basename) || basename === '.env.example';
   return normalized === 'survey.config.js'
+    || /(^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|yarn\.lock)$/.test(normalized)
     || (!isEnvExample && /^\.env(?:\.|$)/.test(basename))
     || /(^|\/)(data|backup|backups|coverage|node_modules|dist)(\/|$)/.test(normalized)
     || /\.(?:db|sqlite|sqlite3)(?:-.+)?$/i.test(basename)
@@ -33,9 +34,9 @@ const forbidden = tracked.filter((file) => {
 
 const required = [
   'package.json',
-  'package-lock.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
   'client/package.json',
-  'client/package-lock.json',
   'survey.config.example.js',
   'migrations/001_initial.sql'
 ];
@@ -48,6 +49,9 @@ const ignorePolicy = [
   ['data/questra.db', true],
   ['data/questra.db-wal', true],
   ['client/dist/index.html', true],
+  ['package-lock.json', true],
+  ['client/package-lock.json', true],
+  ['pnpm-lock.yaml', false],
   ['backup/questra.db', true],
   ['survey.config.example.js', false],
   ['src/app.js', false]

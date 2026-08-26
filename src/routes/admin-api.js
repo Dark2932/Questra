@@ -3,8 +3,11 @@
 const express = require('express');
 const { HttpError } = require('../lib/http');
 const { parseJson, serializeQuestion, serializeSurvey } = require('../lib/serializers');
+const { getAdminAccount, serializeAccount, updateAdminAccount } = require('../admin-account');
+const { deleteAccountSessions } = require('../admin-session');
+const { getSiteSettings, updateSiteSettings } = require('../settings');
 
-function createAdminApi({ db, surveyService }) {
+function createAdminApi({ db, surveyService, config, app }) {
   const router = express.Router();
 
   router.get('/dashboard', (req, res) => {
@@ -30,6 +33,26 @@ function createAdminApi({ db, surveyService }) {
       FROM surveys s ORDER BY s.created_at DESC LIMIT 5
     `).all();
     res.json({ totals, trend, recentSurveys });
+  });
+
+  router.get('/settings', (req, res) => {
+    res.json({ site: getSiteSettings(db, config.siteName), account: serializeAccount(getAdminAccount(db)) });
+  });
+
+  router.put('/settings/site', (req, res) => {
+    const site = updateSiteSettings(db, req.body);
+    config.siteName = site.siteName;
+    config.siteIcon = site.siteIcon;
+    app.locals.siteName = site.siteName;
+    res.json({ site });
+  });
+
+  router.put('/settings/account', (req, res) => {
+    const previous = getAdminAccount(db);
+    const account = updateAdminAccount(db, req.body, { trusted: req.adminAuth?.type === 'legacy-token' });
+    const requiresLogin = Boolean(req.body.newPassword || previous?.username !== account.username);
+    if (requiresLogin) deleteAccountSessions(db, account.id);
+    res.json({ account, requiresLogin });
   });
 
   router.get('/questions', (req, res) => {

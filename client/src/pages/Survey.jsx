@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Typography, Result, Spin, Statistic, Card, Space, Divider, Button } from 'antd';
+import { Typography, Result, Spin, Statistic, Card, Space, Divider, Button, Avatar } from 'antd';
 import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, ReloadOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import SurveyForm from './SurveyForm';
@@ -38,11 +38,12 @@ export default function Survey() {
         <Card bordered={false} style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderRadius: 8 }}>
           {!submitted ? (
             <>
-              <div style={{ marginBottom: 4 }}>
+              <Space size={8} style={{ marginBottom: 8 }}>
+                <Avatar shape="square" size={24} src={survey.siteIcon || undefined}>Q</Avatar>
                 <Text type="secondary" style={{ fontSize: 12, letterSpacing: 0.5 }}>
                   {survey.siteName || 'Questra'} &middot; {survey.kind === 'exam' ? '考试' : '问卷'}
                 </Text>
-              </div>
+              </Space>
               <Title level={3} style={{ marginTop: 0, marginBottom: 8 }}>{survey.title}</Title>
               {survey.description && <Paragraph type="secondary" style={{ marginBottom: 16 }}>{survey.description}</Paragraph>}
               <Space size={16} wrap style={{ marginBottom: 24 }}>

@@ -95,7 +95,7 @@ Questra 只要求 Node.js 20+，但建议使用仍在维护中的 LTS 版本。�
 - Debian / Ubuntu：安装 `build-essential`、`python3` 和 `make`。
 - macOS：执行 `xcode-select --install`，然后重试 npm 安装。
 
-不要因为原生依赖安装失败就删除 `package-lock.json`；先确认 Node 主版本和编译工具链。
+不要因为原生依赖安装失败就删除 `pnpm-lock.yaml`；先确认 Node 主版本、pnpm 版本和编译工具链。
 
 ### 2.2 推荐安装方式
 
@@ -141,6 +141,7 @@ questra start
 - 创建数据目录和数据库文件
 - 执行所有未记录在 `schema_migrations` 的 SQL 迁移
 - 创建随机 Admin Token，并以受限权限写入 `.admin-token`
+- 首次打开管理页时显示初始化向导，创建唯一管理员账户和站点设置
 - 在用户目录的 `.questra\runtime.json` 记录 PID、端口、工作目录和配置路径
 - 将后台进程日志写入 `.questra\questra.log`
 
@@ -169,6 +170,23 @@ curl http://127.0.0.1:3000/api/health
 ```
 
 正常结果包含 `status: "ok"` 和 `database: "ok"`。如果健康检查失败，先看日志，不要直接删除数据库。
+
+#### 初始化和账号登录
+
+首次打开 `/admin` 时，前端会依次显示欢迎页、管理员账户和站点设置。初始化接口只在
+`admin_accounts` 为空时接受请求，数据库通过 `id = 1` 约束保证整个实例只有一组管理员账户。
+密码使用 Node.js 内置 `scrypt` 加随机盐哈希保存，不会写入明文密码。
+
+初始化完成后，登录接口会签发 7 天有效的 HttpOnly 会话 Cookie。修改账号名或密码会使已有会话失效，
+需要在所有设备重新登录。旧版本的 Admin Token、`?token=` 链接和 `Authorization: Bearer` 仍可作为兼容入口。
+
+如果忘记密码，使用仍有效的 Admin Token 进入后台后，在“设置 → 账号安全”中修改；生产环境应同时保护
+`.admin-token` 文件和数据库目录。
+
+后台“设置”按类别分为：
+
+- **站点设置**：修改站点名称和图标；名称留空恢复为 `Questra`，图标支持 URL、站内路径或不超过 128 KB 的图片。
+- **账号安全**：修改管理员昵称、登录账号和密码；系统不提供第二管理员账户。
 
 ### 2.4 配置端口、地址和数据库
 
@@ -717,9 +735,16 @@ module.exports = {
 | --- | --- | --- | --- |
 | `GET` | `/api/health` | 否 | 健康检查 |
 | `GET` | `/api/config` | 否 | 获取站点名称 |
+| `GET` | `/api/setup/status` | 否 | 查询是否已完成首次初始化 |
+| `POST` | `/api/setup` | 否（仅首次） | 创建唯一管理员账户并保存站点初始设置 |
+| `POST` | `/api/auth/login` | 否 | 使用管理员账号密码登录并签发会话 Cookie |
+| `GET` | `/api/auth/me` | 会话或 Token | 获取当前登录状态 |
+| `POST` | `/api/auth/logout` | 否 | 注销当前会话 |
 | `GET` | `/api/surveys/:id` | 否 | 获取有效公开问卷 |
 | `POST` | `/api/surveys/:id/responses` | 否 | 提交答卷 |
 | `GET` | `/api/admin/dashboard` | 是 | 管理统计 |
+| `GET/PUT` | `/api/admin/settings`、`/api/admin/settings/site` | 是 | 查看或修改站点名称、站点图标 |
+| `PUT` | `/api/admin/settings/account` | 是 | 修改唯一管理员昵称、账号或密码 |
 | `GET/POST` | `/api/admin/questions` | 是 | 查询或创建题目 |
 | `PUT/DELETE` | `/api/admin/questions/:id` | 是 | 更新或删除题目 |
 | `GET/POST` | `/api/admin/groups` | 是 | 查询或创建分组 |
@@ -752,6 +777,30 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 ### 5.3 公开数据和保密边界
 
 公开 GET 接口只返回填写者需要看到的字段。考试标准答案只在受保护的管理接口中返回。不要在插件日志中打印完整 Token，也不要把管理 API 直接暴露给不可信客户端。
+
+### 5.4 CLI 命令和参数
+
+| 命令 | 参数 | 说明 |
+| --- | --- | --- |
+| `questra start` | `-p, --port <port>` | 覆盖监听端口，默认 `3000` |
+| `questra start` | `-h, --host <host>` | 覆盖监听地址，默认 `0.0.0.0` |
+| `questra start` | `-c, --config <path>` | 指定配置文件；相对数据库路径仍以安装根目录为基准 |
+| `questra start` | `--foreground` | 在当前终端运行，适合开发、systemd、任务计划程序、launchd、PM2 或 Docker |
+| `questra start` | `--help` | 显示 `start` 子命令帮助；短参数 `-h` 已用于 `--host` |
+| `questra migrate` | `-c, --config <path>` | 使用指定配置创建或升级数据库表结构 |
+| `questra migrate` | `-h, --help` | 显示 `migrate` 子命令帮助 |
+| `questra backup` | `-c, --config <path>` | 使用指定配置选择要备份的数据库 |
+| `questra backup` | `-o, --output <path>` | 指定备份文件；相对路径以数据库目录为基准，默认自动生成文件名 |
+| `questra backup` | `-h, --help` | 显示 `backup` 子命令帮助 |
+| `questra status` | 无 | 查看运行状态、PID、端口和数据目录 |
+| `questra stop` | 无 | 停止当前运行实例 |
+| `questra restart` | 无 | 按原配置和端口重启实例 |
+| `questra help` | 无 | 显示顶层命令列表 |
+| `questra -V, --version` | 无 | 显示当前版本 |
+| `questra -h, --help` | 无 | 显示命令列表及所有子命令参数 |
+
+参数优先级为：命令行参数 > 环境变量 > `survey.config.js` > 默认值。运行 `questra --help` 可查看
+当前安装包实际生成的完整帮助。
 
 ## 6. 数据、迁移和备份
 
@@ -801,14 +850,20 @@ Questra 使用 SQLite 在线备份 API，运行服务期间也能生成一致性
 
 ### 7.1 安装源码依赖
 
-仓库包含根项目和 `client/` 两份 lockfile：
+仓库推荐使用 pnpm workspace 管理根项目和 `client/`，CI 以根目录的 `pnpm-lock.yaml` 复现依赖。先安装 Node.js 20+；Node.js 20 请搭配 pnpm 10，较新的 Node.js 可以使用其兼容的 pnpm 版本。使用 pnpm 时在仓库根目录执行：
 
 ```powershell
-npm ci
+pnpm install --frozen-lockfile
+```
+
+npm 开发者不需要安装 pnpm，分别安装后端和前端依赖：
+
+```powershell
+npm install
 npm run install:client
 ```
 
-Linux / macOS 使用完全相同的 npm 命令；如果需要创建本地配置：
+Linux / macOS 使用完全相同的命令；如果需要创建本地配置：
 
 ```bash
 cp survey.config.example.js survey.config.js
@@ -820,14 +875,14 @@ Windows PowerShell 对应：
 Copy-Item survey.config.example.js survey.config.js
 ```
 
-根项目是 CommonJS 后端，前端是 React + Vite 的 ESM 项目。不要删除任意一个 lockfile；CI 和发布构建都依赖它们复现依赖版本。
+根项目是 CommonJS 后端，前端是 React + Vite 的 ESM 项目。项目脚本会自动沿用发起命令的 npm 或 pnpm。`pnpm-lock.yaml` 是仓库和 CI 的依赖基线；npm 本地生成的 `package-lock.json` 不提交，依赖变更最终需要同步更新 `pnpm-lock.yaml`。
 
 ### 7.2 开发服务器
 
 一键启动后端和前端：
 
 ```powershell
-npm run dev:all
+pnpm run dev:all
 ```
 
 后端使用 Node.js `--watch` 在 `3000` 端口前台运行，Vite 使用 `5173` 端口，并把 `/api` 和 `/static` 代理到后端。开发管理地址：
@@ -839,11 +894,13 @@ http://localhost:5173/admin?token=<Admin Token>
 也可以分开启动：
 
 ```powershell
-npm run dev
-npm run dev:client
+pnpm run dev
+pnpm run dev:client
 ```
 
 Linux / macOS 的命令相同。环境变量仍按终端语法设置：PowerShell 使用 `$env:NAME = 'value'`，Bash / Zsh 使用 `export NAME='value'`。
+
+npm 开发者可把本节命令开头的 `pnpm` 替换为 `npm`，例如 `npm run dev:all`；其余参数不变。
 
 ### 7.3 代码职责
 
@@ -865,11 +922,13 @@ views/、public/             无 React 构建时的兼容界面
 ### 7.4 测试和检查
 
 ```powershell
-npm run check
-npm run build
+pnpm run check
+pnpm run build
 ```
 
 `check` 包含仓库提交边界检查、后端 ESLint、Node.js 集成测试、前端 ESLint 和 Vitest。`build` 会生成 `client/dist`，生产 Express 会托管该目录。
+
+npm 对应命令为 `npm run check` 和 `npm run build`。
 
 ### 7.5 发布 npm 包
 
@@ -878,13 +937,13 @@ npm run build
 ```powershell
 npm login --registry=https://registry.npmjs.org
 npm whoami
-npm run release:check
+pnpm run release:check
 npm version patch
 npm publish --access public
 git push origin main --follow-tags
 ```
 
-`npm version minor` 用于新增向后兼容功能，`npm version major` 用于不兼容变更。`npm publish` 会先执行 `prepublishOnly` 检查，再执行 `prepack` 重建前端。详细发布注意事项以 `package.json` 和 README 的当前内容为准。
+开发脚本兼容 npm 和 pnpm；上面的 `npm login`、`npm whoami`、`npm version` 和 `npm publish` 用于 npm Registry 身份、版本与发布流程。`npm version minor` 用于新增向后兼容功能，`npm version major` 用于不兼容变更。`npm publish` 会先执行 `prepublishOnly` 检查，再执行 `prepack` 重建前端。详细发布注意事项以 `package.json` 和 README 的当前内容为准。
 
 ## 8. 故障排查
 
@@ -904,7 +963,7 @@ command -v questra
 which questra
 ```
 
-确认 npm 全局目录在 PATH 中，然后重新打开终端。源码开发时也可以在仓库目录执行 `npm link` 注册当前版本。
+确认 npm 全局目录在 PATH 中，然后重新打开终端。源码开发时可以按当前包管理器执行 `pnpm link --global` 或 `npm link` 注册当前版本。
 
 ### 端口被占用
 
@@ -956,7 +1015,7 @@ tail -n 100 ~/.questra/questra.log
 检查 `client/dist/index.html` 是否存在并重新构建：
 
 ```powershell
-npm run build
+pnpm run build
 ```
 
 没有构建产物时，Questra 会回退到 `views/` 的兼容 EJS 界面，这是预期的降级行为。

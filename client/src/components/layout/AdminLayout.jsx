@@ -1,6 +1,6 @@
 import { useNavigate, Link, useLocation, useOutlet } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Layout, Menu, Space, Typography, Segmented } from 'antd';
+import { Layout, Space, Typography, Segmented, Button } from 'antd';
 import { motion } from 'framer-motion';
 import {
   DashboardOutlined,
@@ -9,12 +9,13 @@ import {
   SunOutlined,
   MoonOutlined,
   SettingOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 
 const { Header, Content } = Layout;
 
-export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onThemeChange }) {
+export default function AdminLayout({ authenticated, site, user, onLogout, theme, resolvedTheme, onThemeChange }) {
   const navigate = useNavigate();
   const location = useLocation();
   const outlet = useOutlet();
@@ -40,7 +41,7 @@ export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onT
   useEffect(() => () => window.clearTimeout(revealTimer.current), []);
 
   useEffect(() => {
-    if (!token) {
+    if (!authenticated) {
       navigate('/unauthorized', { replace: true });
       return;
     }
@@ -48,17 +49,17 @@ export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onT
     verified.current = true;
 
     api.getDashboard().catch((err) => {
-      if (String(err.message).includes('401') || String(err.message).includes('Token')) {
+      if (err.status === 401 || String(err.message).includes('Token')) {
         onLogout();
         navigate('/unauthorized', { replace: true });
       }
     });
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!token) return null;
+  if (!authenticated) return null;
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       <Header
         style={{
           position: 'sticky',
@@ -96,37 +97,39 @@ export default function AdminLayout({ token, onLogout, theme, resolvedTheme, onT
                 flexShrink: 0,
               }}
             >
-              Q
+              {site?.siteIcon
+                ? <img src={site.siteIcon} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 8 }} />
+                : <span style={{ display: 'block', lineHeight: 1, transform: 'translateY(-1px)' }}>Q</span>}
             </div>
             <Typography.Text strong style={{ fontSize: 16, whiteSpace: 'nowrap' }}>
-              Questra
+              {site?.siteName || 'Questra'}
             </Typography.Text>
           </Link>
-          <Menu
-            mode="horizontal"
-            selectedKeys={[location.pathname]}
-            items={[
-              { key: '/admin', icon: <DashboardOutlined />, label: <Link to="/admin">仪表盘</Link> },
-              { key: '/admin/questions', icon: <FormOutlined />, label: <Link to="/admin/questions">问题池</Link> },
-              { key: '/admin/surveys', icon: <UnorderedListOutlined />, label: <Link to="/admin/surveys">问卷 / 考试</Link> },
-            ]}
-            style={{ minWidth: 0, border: 'none', background: 'transparent', color: 'var(--ant-color-text)' }}
-          />
+          <nav className="admin-nav" aria-label="管理导航">
+            <Link className={location.pathname === '/admin' ? 'active' : ''} to="/admin"><DashboardOutlined />仪表盘</Link>
+            <Link className={location.pathname.startsWith('/admin/questions') ? 'active' : ''} to="/admin/questions"><FormOutlined />题库</Link>
+            <Link className={location.pathname.startsWith('/admin/surveys') ? 'active' : ''} to="/admin/surveys"><UnorderedListOutlined />问卷 / 考试</Link>
+            <Link className={location.pathname.startsWith('/admin/settings') ? 'active' : ''} to="/admin/settings"><SettingOutlined />设置</Link>
+          </nav>
         </Space>
 
-        <Segmented
-          size="small"
-          value={theme}
-          onChange={onThemeChange}
-          options={[
-            { value: 'light', icon: <SunOutlined /> },
-            { value: 'dark', icon: <MoonOutlined /> },
-            { value: 'system', icon: <SettingOutlined /> },
-          ]}
-        />
+        <Space size={8}>
+          <Typography.Text type="secondary" className="admin-user-name">{user?.nickname || '管理员'}</Typography.Text>
+          <Button type="text" size="small" icon={<LogoutOutlined />} onClick={onLogout}>退出</Button>
+          <Segmented
+            size="small"
+            value={theme}
+            onChange={onThemeChange}
+            options={[
+              { value: 'light', icon: <SunOutlined /> },
+              { value: 'dark', icon: <MoonOutlined /> },
+              { value: 'system', icon: <SettingOutlined /> },
+            ]}
+          />
+        </Space>
       </Header>
 
-      <Content style={{ padding: 24, maxWidth: 1200, width: '100%', marginInline: 'auto' }}>
+      <Content style={{ padding: 24, maxWidth: 1200, width: '100%', marginInline: 'auto', overflowY: 'auto', minHeight: 0 }}>
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0 }}

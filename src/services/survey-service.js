@@ -154,7 +154,7 @@ function createSurveyService(db) {
     let questionPoints = new Map(sourceQuestions.map((question) => [question.id, 0]));
     if (kind === 'exam') {
       if (sourceQuestions.some((question) => question.correct_answer_json === null)) {
-        throw new HttpError(400, '考试中的每道题都必须先在问题池设置标准答案');
+        throw new HttpError(400, '考试中的每道题都必须先在题库设置标准答案');
       }
       ({ scoringMode, maxScore, scoringConfig, questionPoints } = buildScoring(input, sourceQuestions));
     }

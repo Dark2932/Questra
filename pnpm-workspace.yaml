@@ -1,0 +1,7 @@
+packages:
+  - client
+
+# pnpm 默认禁用未批准的依赖构建脚本，只允许项目实际需要的原生/构建工具。
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild
