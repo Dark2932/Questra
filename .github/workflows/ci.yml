@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -33,13 +37,14 @@ jobs:
           npm pack --dry-run --ignore-scripts
           node -e "const p=require('./package.json');const f=p.files||[];if(!f.some((entry)=>entry.startsWith('client/dist'))){console.error('files 缺少 client/dist');process.exit(1)}else{console.log('✓ client/dist 已包含在发布包中')}"
 
-  tag:
-    name: 递增版本并创建标签
+  version:
+    name: 确定版本、创建标签和 Release
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') }}
     needs: quality
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,14 +52,78 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-      - name: 自动递增补丁版本并创建标签
+      - name: 确定版本并创建标签
+        id: version
         shell: bash
         run: |
-          npm version patch --no-git-tag-version
-          VERSION="$(node -p "require('./package.json').version")"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json
-          git commit -m "chore: bump Questra version to ${VERSION} [skip ci]"
+          set -euo pipefail
+
+          CURRENT_VERSION="$(node -p "require('./package.json').version")"
+          PREVIOUS_VERSION="$(git show HEAD^:package.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).version))")"
+
+          VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+$'
+          [[ "$CURRENT_VERSION" =~ $VERSION_PATTERN ]] || {
+            echo "package.json 版本号必须使用 major.minor.patch 格式，当前为 ${CURRENT_VERSION}"
+            exit 1
+          }
+          [[ "$PREVIOUS_VERSION" =~ $VERSION_PATTERN ]] || {
+            echo "上一个版本号格式无效：${PREVIOUS_VERSION}"
+            exit 1
+          }
+
+          if [[ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]]; then
+            npm version patch --no-git-tag-version
+            VERSION="$(node -p "require('./package.json').version")"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package.json
+            git commit -m "chore: bump Questra version to ${VERSION} [skip ci]"
+            PUSH_BRANCH=true
+          else
+            VERSION="$CURRENT_VERSION"
+            PUSH_BRANCH=false
+          fi
+
+          git rev-parse --verify --quiet "refs/tags/${VERSION}" >/dev/null && {
+            echo "标签 ${VERSION} 已存在，请先设置一个尚未使用的版本号"
+            exit 1
+          }
+
           git tag --annotate "$VERSION" --message "Questra ${VERSION}"
-          git push --atomic origin "HEAD:${GITHUB_REF_NAME}" "refs/tags/${VERSION}"
+          if [[ "$PUSH_BRANCH" = true ]]; then
+            git push --atomic origin "HEAD:${GITHUB_REF_NAME}" "refs/tags/${VERSION}"
+          else
+            git push origin "refs/tags/${VERSION}"
+          fi
+
+          IFS=. read -r PREVIOUS_MAJOR PREVIOUS_MINOR _ <<< "$PREVIOUS_VERSION"
+          IFS=. read -r CURRENT_MAJOR CURRENT_MINOR _ <<< "$VERSION"
+          if [[ "$CURRENT_MAJOR" != "$PREVIOUS_MAJOR" || "$CURRENT_MINOR" != "$PREVIOUS_MINOR" ]]; then
+            CREATE_RELEASE=true
+          else
+            CREATE_RELEASE=false
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "create_release=${CREATE_RELEASE}" >> "$GITHUB_OUTPUT"
+
+      - name: 创建 major/minor Release
+        if: ${{ steps.version.outputs.create_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$VERSION" \
+            --verify-tag \
+            --title "Questra ${VERSION}" \
+            --generate-notes
+
+      - name: 触发 npm 发布并上传 Release 包
+        if: ${{ steps.version.outputs.create_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: gh workflow run publish.yaml --ref main --field tag="$VERSION"

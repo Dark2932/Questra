@@ -945,21 +945,23 @@ npm 对应命令为 `npm run check` 和 `npm run build`。
 
 ### 7.5 发布 npm 包
 
-版本递增和正式发布是两个步骤。推送到 `main` 并通过 CI 后，工作流自动执行 `npm version patch`，提交 `package.json`，并创建同名 Git 标签。需要手动调整版本时，可使用 `npm version patch`、`npm version minor` 或 `npm version major`，再运行检查并提交变更。
+版本递增和正式发布是两个步骤。推送到 `main` 并通过 CI 后，如果提交没有改变 `package.json` 的版本号，工作流会自动执行 `npm version patch`、提交版本变更并创建同名 Git 标签；如果提交已经手动改了版本号，则直接使用该版本创建标签，不会再额外递增。需要手动调整版本时，可使用 `npm version patch`、`npm version minor` 或 `npm version major`，再运行检查并提交变更。
 
 正式发布的 GitHub Release + npm Trusted Publishing 流程见下一节。日常开发脚本兼容 npm 和 pnpm；`npm login`、`npm whoami` 和手动 `npm publish` 仅作为不使用 Trusted Publishing 时的备用发布方式。
 
 ### 7.6 从标签发布 npm
 
-每次提交推送到 `main` 并通过质量检查（后端检查、前端检查、构建和发布白名单校验）后，CI 会执行以下流程：
+只有提交进入 `main` 并通过质量检查（后端检查、前端检查、构建和发布白名单校验）后，版本 job 才会执行以下流程；Pull Request 或其他分支不会直接创建标签。
 
-1. 用 npm 的 `version patch --no-git-tag-version` 将 `package.json` 的补丁版本加 1。
-2. 以 `github-actions[bot]` 身份提交版本变更，并使用 `[skip ci]` 防止版本提交再次触发递增循环。
-3. 创建与 `package.json` 完全相同的 Git 标签，例如版本 `0.2.1` 对应标签 `0.2.1`，再将提交和标签原子推送到仓库。
+1. 比较当前提交和上一个提交的 `package.json` 版本号。版本未变化时，用 npm 的 `version patch --no-git-tag-version` 自动增加补丁号，并以 `github-actions[bot]` 身份提交 `[skip ci]` 版本变更；版本已经变化时，直接使用提交中的版本号。
+2. 创建与 `package.json` 完全相同的 Git 标签，例如版本 `0.3.0` 对应标签 `0.3.0`。
+3. 如果 major 或 minor 发生变化，自动创建 GitHub Release，并显式触发 `publish.yaml`；patch 版本只打标签，不自动创建 Release。
 
-自动标签 job 需要 `contents: write` 权限；若组织或分支保护策略禁止机器人回写 `main` 或创建标签，该 job 会失败，需要调整策略后重新运行。
+版本 job 需要 `contents: write` 和 `actions: write` 权限；若组织或分支保护策略禁止机器人回写 `main`、创建标签或触发工作流，该 job 会失败，需要调整策略后重新运行。
 
-维护者首次启用前，需要在 npm 包的 **Trusted Publishers** 设置中添加 GitHub Actions，填写仓库所有者 `Dark2932`、仓库名 `Questra` 和工作流文件名 `publish.yaml`。然后在 GitHub 中选择该版本标签并正式发布 Release；`.github/workflows/publish.yaml` 会检查 Release 标签与 `package.json` 版本是否一致，运行完整发布检查，然后通过 npm Trusted Publishing 的 OIDC 身份发布到 npm Registry。工作流不读取或保存长期 `NPM_TOKEN`。
+维护者首次启用前，需要在 npm 包的 **Trusted Publishers** 设置中添加 GitHub Actions，填写仓库所有者 `Dark2932`、仓库名 `Questra` 和工作流文件名 `publish.yaml`。手动发布 Release 时，`release.published` 会触发该工作流；自动创建的 Release 使用 `GITHUB_TOKEN`，GitHub 不会可靠地产生下游 Release 事件，因此版本 job 会额外以 `workflow_dispatch` 显式触发 `publish.yaml`。工作流会检查 Release 标签与 `package.json` 版本一致，生成一个 `.tgz`，先上传到 Release，再将同一个文件通过 npm Trusted Publishing 的 OIDC 身份发布到 npm Registry。工作流不读取或保存长期 `NPM_TOKEN`。
+
+如果历史 Release 没有触发工作流，可在 Actions 页面选择 **Publish to npm → Run workflow**，输入已有标签（例如 `0.2.1`）手动补跑。`publish.yaml` 同时支持 `release.published` 和这个手动入口。
 
 这里的 `pnpm install` 只在 GitHub Actions 构建机上执行，用于安装测试、Lint 和前端构建所需的源码依赖；它不会进入发布包，也不是用户安装 Questra 的前置条件。发布完成后，用户直接使用 npm 即可：
 

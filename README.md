@@ -95,6 +95,6 @@ questra stop
 - 数据库使用 SQLite WAL 模式，在线备份使用 `questra backup`；生产环境不要只复制 `.db` 文件。
 - 管理后台使用账号密码和会话 Cookie，兼容 Admin Token。不要公开 Token、数据库或 Webhook 密钥。
 - 源码开发推荐 pnpm 11，同时兼容 npm；详细测试、插件、API、迁移和发布流程见指南。
-- 推送到 `main` 并通过 CI 后，会自动递增补丁版本并创建同名 Git 标签；发布对应 GitHub Release 后，工作流会通过 OIDC 发布到 npm。
+- 推送到 `main` 并通过 CI 后，若没有手动修改版本号，工作流会自动递增补丁版本并创建同名 Git 标签；手动修改 `package.json` 的版本号也会直接创建对应标签。major/minor 版本变化会自动创建 GitHub Release，上传与 npm 发布完全相同的 `.tgz` 包，并通过 OIDC 发布到 npm。
 
 许可证： [MIT License](LICENSE)
