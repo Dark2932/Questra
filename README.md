@@ -35,15 +35,21 @@ Windows 使用 PowerShell，Linux 和 macOS 使用 Terminal；三套系统的 np
 
 ## 启动
 
-进入**<u>你希望保存问卷数据的目录</u>**，直接启动：
+`questra start` 每次都可以从任意目录执行。若要加载自定义 `survey.config.js`，请在配置文件所在目录执行，或显式传入 `--config`；否则 Questra 会使用默认配置。无论从哪里执行，数据库都不会写入当前目录：
 
 ```powershell
 questra start
 ```
 
+从其他目录加载配置：
+
+```powershell
+questra start --config C:\Questra\production\survey.config.js
+```
+
 启动后会自动完成这些事情：
 
-1. 创建 `data/questra.db` SQLite 数据库。
+1. 在 Questra 安装根目录的 `data/questra.db` 创建 SQLite 数据库（不会写入当前执行目录）。
 2. 执行尚未应用的数据库迁移。
 3. 创建并保存 Admin Token。
 4. 在后台监听 `http://localhost:3000`。
@@ -74,9 +80,9 @@ questra start --port 8080
 
 | 系统 | 默认数据目录 | 默认日志目录 | 长期运行建议 |
 | --- | --- | --- | --- |
-| Windows | `当前目录\data` | `%USERPROFILE%\.questra\questra.log` | 任务计划程序、PM2 或前台模式 |
-| Linux | `当前目录/data` | `~/.questra/questra.log` | systemd 或 PM2 |
-| macOS | `当前目录/data` | `~/.questra/questra.log` | launchd、PM2 或前台模式 |
+| Windows | Questra 安装根目录 `data\` | `%USERPROFILE%\.questra\questra.log` | 任务计划程序、PM2 或前台模式 |
+| Linux | Questra 安装根目录 `data/` | `~/.questra/questra.log` | systemd、PM2 或 Docker |
+| macOS | Questra 安装根目录 `data/` | `~/.questra/questra.log` | launchd、PM2 或前台模式 |
 
 浏览器访问方式、管理界面和公开问卷链接在三个系统上相同。
 
@@ -149,7 +155,7 @@ tail -n 30 ~/.questra/questra.log
 
 ### 配置文件
 
-Questra 默认使用当前目录的 `survey.config.js`。没有这个文件也可以启动；需要自定义端口、数据库位置、站点名称或插件钩子时再创建它。可参考仓库中的 `survey.config.example.js`。
+Questra 默认从当前目录读取 `survey.config.js`，但数据库不会跟随当前目录变化：默认始终保存到 Questra 安装根目录的 `data/`。没有配置文件也可以启动；需要自定义端口、数据库位置、站点名称或插件钩子时再创建它。可参考仓库中的 `survey.config.example.js`。
 
 常用配置：
 
@@ -157,7 +163,7 @@ Questra 默认使用当前目录的 `survey.config.js`。没有这个文件也�
 module.exports = {
   port: 3000,
   host: '0.0.0.0',
-  database: './data/questra.db',
+  database: './data/questra.db', // 相对路径以 Questra 安装根目录为基准
   siteName: '我的问卷',
   logging: true
 };
@@ -169,8 +175,9 @@ Windows 的配置路径可以是 `C:\Questra\production\survey.config.js`；Linu
 
 ### 数据、Token 和备份
 
-- 数据库默认位于 `data/questra.db`。
-- Admin Token 默认位于 `data/.admin-token`。
+- 数据库默认位于 Questra 安装根目录的 `data/questra.db`。
+- 可设置 `QUESTRA_DATA_DIR` 把数据放到安装目录之外（生产环境推荐使用独立数据盘）；该环境变量优先于配置文件的 `database`。
+- Admin Token 默认位于数据库目录的 `.admin-token`（默认是安装根目录的 `data/.admin-token`）。
 - 服务日志默认位于用户目录的 `.questra/questra.log`。
 - 数据库使用 SQLite WAL 模式，建议使用在线备份命令：
 
@@ -178,7 +185,13 @@ Windows 的配置路径可以是 `C:\Questra\production\survey.config.js`；Linu
   questra backup
   ```
 
+默认备份文件写入数据库所在目录；使用 `--output` 可以指定其他绝对路径。
+
 不要在服务运行时只复制 `.db` 文件；WAL 文件中可能还有未合并的数据。
+
+从旧版本升级时，如果旧数据库在启动目录的 `data/`，请先停止服务，再将
+`QUESTRA_DATA_DIR` 设置为该目录的绝对路径。这样新版本会继续使用原数据库和
+`.admin-token`，确认数据正常后再考虑迁移到独立数据盘。
 
 ### 认证和安全
 

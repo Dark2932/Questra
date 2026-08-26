@@ -3,6 +3,7 @@
 module.exports = {
   port: 3000,
   host: '0.0.0.0',
+  // 默认位于 Questra 安装目录的 data/；也可用绝对路径指定外部数据盘。
   database: './data/questra.db',
   siteName: '我的问卷',
   // 是否将每次 HTTP 请求打印到运行 Questra 的终端，默认开启。

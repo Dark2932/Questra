@@ -13,7 +13,13 @@ const path = require('node:path');
  * @property {{beforeSubmit?: Function, afterSubmit?: Function}} [hooks]
  */
 
-/** 从启动目录加载配置，便于通过 npx 在任意目录运行。 */
+/**
+ * Questra 安装根目录。源码运行时是仓库根目录，npm 安装后是包目录。
+ * 默认数据固定在安装根目录，避免从不同工作目录启动时生成多份数据库。
+ */
+const installationDirectory = path.resolve(__dirname, '..');
+
+/** 从当前目录加载配置；配置中的相对数据库路径以安装根目录为基准。 */
 function loadConfig(configPath) {
   const resolved = path.resolve(process.cwd(), configPath || 'survey.config.js');
   let userConfig = {};
@@ -23,18 +29,23 @@ function loadConfig(configPath) {
     userConfig = require(resolved);
   }
 
-  const database = userConfig.database || './data/questra.db';
+  const dataDirectory = process.env.QUESTRA_DATA_DIR
+    ? path.resolve(installationDirectory, process.env.QUESTRA_DATA_DIR)
+    : null;
+  const database = dataDirectory
+    ? path.join(dataDirectory, 'questra.db')
+    : (userConfig.database || path.join(installationDirectory, 'data', 'questra.db'));
   return {
     port: 3000,
     host: '0.0.0.0',
     siteName: 'Questra',
     logging: true,
     ...userConfig,
-    // 相对数据库路径始终以进程启动目录为基准，而不是 npm 包目录。
-    database: path.resolve(process.cwd(), database),
+    // 相对数据库路径始终以 Questra 安装目录为基准，而不是执行命令的目录。
+    database: path.resolve(installationDirectory, database),
     // userConfig.hooks 可能缺省或为 null，这里统一归一化为对象。
     hooks: userConfig.hooks || {}
   };
 }
 
-module.exports = { loadConfig };
+module.exports = { loadConfig, installationDirectory };

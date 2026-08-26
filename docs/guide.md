@@ -29,17 +29,19 @@ Questra 是一个 Node.js 进程。这个进程同时承担三件事：
 
 ### 1.3 运行目录很重要
 
-Questra 按“启动命令所在目录”读取配置和相对路径：
+Questra 从“启动命令所在目录”读取配置，但默认数据路径绑定到 Questra 安装根目录：
 
 ```text
-当前目录/
-├─ survey.config.js       # 可选，本地配置
+配置所在目录/
+└─ survey.config.js       # 可选，本地配置
+
+Questra 安装根目录/
 └─ data/
    ├─ questra.db          # SQLite 数据库
    └─ .admin-token        # 自动生成的管理 Token
 ```
 
-例如你在 `D:\survey` 目录执行 `questra start`，默认数据库就是 `D:\survey\data\questra.db`。不要在不同目录来回启动同一个实例，否则会得到多个数据库和多个 Token。
+例如 Questra 安装在 `C:\Users\me\AppData\Roaming\npm\node_modules\questra`，无论你从哪个目录执行 `questra start`，默认数据库都会是该安装根目录下的 `data\questra.db`。不要直接编辑或删除 npm 安装目录中的数据；生产环境建议用 `QUESTRA_DATA_DIR` 指向安装目录之外的持久化目录。
 
 ## 2. 部署
 
@@ -67,7 +69,7 @@ Questra 的 Node.js、SQLite、浏览器界面和 REST API 在 Windows、Linux�
 | --- | --- | --- | --- |
 | 终端 | PowerShell | Bash / Zsh | Terminal 中的 Zsh / Bash |
 | 配置路径示例 | `C:\Questra\production\survey.config.js` | `/srv/questra/survey.config.js` | `/Users/me/questra/survey.config.js` |
-| 数据目录 | `当前目录\data` | `当前目录/data` | `当前目录/data` |
+| 数据目录 | 安装根目录 `data\` | 安装根目录 `data/` | 安装根目录 `data/` |
 | 用户运行目录 | `%USERPROFILE%\.questra` | `~/.questra` | `~/.questra` |
 | 查看日志 | `Get-Content ... -Tail 100` | `tail -n 100 ...` | `tail -n 100 ...` |
 | 查看端口 | `Get-NetTCPConnection` | `ss -ltnp` 或 `lsof -i` | `lsof -nP -iTCP` |
@@ -103,7 +105,7 @@ Questra 只要求 Node.js 20+，但建议使用仍在维护中的 LTS 版本。�
 npm install -g questra
 ```
 
-全局安装做了两件事：把 Questra 的运行文件安装到 npm 全局目录，并把 `questra` 命令加入 PATH。它不会决定数据保存在哪里；数据仍然保存到你执行 `questra start` 时所在的目录。
+全局安装做了两件事：把 Questra 的运行文件安装到 npm 全局目录，并把 `questra` 命令加入 PATH。默认数据跟随 Questra 安装根目录，不会因为你从不同目录执行命令而产生多份数据库。生产环境应设置 `QUESTRA_DATA_DIR`，把数据库放在 npm 包目录之外，避免升级或卸载包时误操作数据。
 
 如果 PowerShell 提示“无法识别 questra”，执行 `npm prefix -g` 查看全局目录，确认该目录在 PATH 中，然后重新打开终端。Windows 下命令入口通常位于 `%AppData%\npm\questra.ps1`。
 
@@ -197,7 +199,7 @@ module.exports = {
 | --- | --- | --- |
 | `port` | HTTP 监听端口 | `3000` |
 | `host` | 监听地址；`0.0.0.0` 表示接受外部访问 | `0.0.0.0` |
-| `database` | SQLite 文件路径，相对当前工作目录 | `./data/questra.db` |
+| `database` | SQLite 文件路径；相对路径以安装根目录为基准 | `./data/questra.db` |
 | `siteName` | 页面和标题中显示的站点名 | `Questra` |
 | `logging` | 是否输出请求日志 | `true` |
 | `hooks` | 提交前后扩展钩子 | `{}` |
@@ -209,11 +211,53 @@ module.exports = {
 地址：--host > HOST > survey.config.js > 0.0.0.0
 ```
 
-数据库路径会被解析成绝对路径，因此迁移和服务启动必须使用同一个工作目录或同一个配置文件。
+数据库路径会被解析成绝对路径。默认路径是安装根目录的 `data/questra.db`；配置中的相对 `database` 路径也以安装根目录为基准，而不是当前工作目录。迁移、启动和备份会因此始终指向同一个数据库。
 
 ### 2.5 固定管理 Token
 
 默认策略是：优先使用 `QUESTRA_ADMIN_TOKEN`，没有时复用数据库目录下的 `.admin-token`，文件不存在才生成随机 Token。
+
+生产环境建议先固定持久化数据目录：
+
+Windows PowerShell：
+
+```powershell
+$env:QUESTRA_DATA_DIR = 'D:\QuestraData'
+```
+
+Linux / macOS：
+
+```bash
+export QUESTRA_DATA_DIR='/var/lib/questra'
+```
+
+`QUESTRA_DATA_DIR` 优先于配置文件中的 `database`。如果它使用相对路径，仍以 Questra 安装根目录为基准。生产环境使用绝对路径更清晰，也不受 npm 更新包目录的影响。
+
+#### 从旧版本迁移数据
+
+旧版本可能把数据库写入“执行命令的目录/data”。升级后，新版本默认改用安装根目录，
+因此不会自动在多个旧目录之间猜测要使用哪一份数据。迁移时请按以下顺序操作：
+
+1. 停止旧的 Questra 服务，并确认旧数据库目录中同时保留 `questra.db`、`questra.db-wal`、`questra.db-shm`（如果存在）及 `.admin-token`。
+2. 将 `QUESTRA_DATA_DIR` 设置为这个旧 `data` 目录的绝对路径。
+3. 使用同一个环境变量运行 `questra migrate` 和 `questra start`，检查问卷和答卷是否完整。
+4. 确认无误后，再把数据库目录复制到独立数据盘，并将环境变量更新为新路径。
+
+Windows PowerShell 示例：
+
+```powershell
+$env:QUESTRA_DATA_DIR = 'D:\old-questra\data'
+questra migrate
+questra start
+```
+
+Linux / macOS 示例：
+
+```bash
+export QUESTRA_DATA_DIR='/srv/old-questra/data'
+questra migrate
+questra start
+```
 
 PowerShell 临时设置：
 
@@ -269,6 +313,7 @@ WantedBy=multi-user.target
 
 ```text
 QUESTRA_ADMIN_TOKEN=replace-with-secret
+QUESTRA_DATA_DIR=/var/lib/questra
 QUESTRA_RUNTIME_FILE=/run/questra/runtime.json
 QUESTRA_LOG_FILE=/var/log/questra/questra.log
 ```
@@ -309,6 +354,7 @@ macOS 的系统级服务通常使用 launchd。用户级服务可以保存到 `~
   <dict>
     <key>NODE_ENV</key><string>production</string>
     <key>QUESTRA_ADMIN_TOKEN</key><string>replace-with-secret</string>
+    <key>QUESTRA_DATA_DIR</key><string>/Users/me/Library/Application Support/Questra</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -742,6 +788,8 @@ questra backup --output D:\backup\questra.db
 
 Questra 使用 SQLite 在线备份 API，运行服务期间也能生成一致性快照。WAL 模式下不要只复制主 `.db` 文件；`-wal` 和 `-shm` 中可能有尚未合并的数据。
 
+不传 `--output` 时，备份写入数据库所在目录。相对 `--output` 路径也以数据库目录为基准；跨磁盘或交给外部备份系统时建议使用绝对路径。
+
 备份恢复前：
 
 1. 停止 Questra。
@@ -802,7 +850,7 @@ Linux / macOS 的命令相同。环境变量仍按终端语法设置：PowerShel
 ```text
 bin/questra.js              CLI、后台进程、备份和生命周期
 src/app.js                  Express 中间件和路由装配
-src/config.js               配置默认值和工作目录解析
+src/config.js               配置默认值、安装目录和数据路径解析
 src/db.js                   SQLite 连接和迁移
 src/routes/                 管理 API、公开 API、兼容页面
 src/services/               快照、校验、判分和事务
@@ -901,7 +949,7 @@ tail -n 100 ~/.questra/questra.log
 
 ### 数据库打不开或迁移失败
 
-检查当前工作目录、数据库路径和文件权限。先备份现有数据库，再处理迁移；不要为了“重新开始”直接删除生产数据库。
+检查安装目录、`QUESTRA_DATA_DIR`、数据库路径和文件权限。Linux/macOS 全局 npm 目录可能不可写；此时应把 `QUESTRA_DATA_DIR` 指向服务账号可写的持久化目录。先备份现有数据库，再处理迁移；不要为了“重新开始”直接删除生产数据库。
 
 ### 页面空白或加载旧界面
 

@@ -109,6 +109,7 @@ program
       console.log(`访问地址: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
       console.log(`管理地址: http://localhost:${port}/admin?token=${adminToken}`);
       console.log(`Admin Token: ${adminToken}`);
+      console.log(`数据目录: ${path.dirname(config.database)}`);
       console.log('Token 已持久化到数据目录 .admin-token 文件，重启后保持不变。');
       console.log(options.foreground
         ? '服务在前台运行，按 Ctrl+C 停止。'
@@ -201,6 +202,7 @@ program
     console.log('Questra 正在运行。');
     console.log('PID: ' + state.pid);
     console.log('地址: http://localhost:' + state.port);
+    if (state.database) console.log('数据目录: ' + path.dirname(state.database));
     console.log('工作目录: ' + state.cwd);
     console.log('启动时间: ' + state.startedAt);
   });
@@ -262,7 +264,7 @@ program
     const config = loadConfig(options.config);
     const db = openDatabase(config.database);
     const defaultName = `questra-backup-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.db`;
-    const output = path.resolve(process.cwd(), options.output || path.join('data', defaultName));
+    const output = path.resolve(path.dirname(config.database), options.output || defaultName);
     console.log(`备份数据库: ${config.database}`);
     console.log(`输出文件: ${output}`);
     fs.mkdirSync(path.dirname(output), { recursive: true });
