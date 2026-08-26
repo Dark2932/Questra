@@ -30,7 +30,7 @@
     "start": "node bin/questra.js start",
     "migrate": "node bin/questra.js migrate",
     "dev": "node --watch bin/questra.js start --foreground",
-    "test": "node --test test",
+    "test": "node scripts/run-tests.js",
     "test:client": "node scripts/run-client.js test",
     "lint": "eslint src bin scripts test",
     "lint:client": "node scripts/run-client.js lint",
@@ -47,7 +47,9 @@
     "prepack": "node scripts/build-client.js --prepack"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22",
+    "npm": ">=10.9.0",
+    "pnpm": ">=11.0.0"
   },
   "keywords": [
     "survey",

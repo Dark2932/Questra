@@ -7,6 +7,13 @@
 
 README 只负责帮助你快速跑起来；本文件解释每个步骤背后的含义，并给出可以直接改造的示例。
 
+## 快速导航
+
+- 只想安装使用：阅读 README 的“安装”和“启动”。
+- 负责线上部署：阅读第 2 节、第 6 节和第 8 节。
+- 需要调用接口或写自动化：阅读第 4 节和第 5 节。
+- 需要修改源码或发布版本：阅读第 7 节。
+
 ## 1. 先理解 Questra
 
 ### 1.1 Questra 由什么组成
@@ -47,8 +54,8 @@ Questra 安装根目录/
 
 ### 2.1 环境要求
 
-- Node.js 20 或更高版本
-- npm 10 或更高版本
+- Node.js 22 或更高版本
+- npm >=10.9.0 或 pnpm >=11.0.0
 - 能编译或安装 `better-sqlite3` 原生模块的 Windows、Linux 或 macOS
 - 生产环境建议有 HTTPS 反向代理和定期备份空间
 
@@ -57,9 +64,12 @@ Questra 安装根目录/
 ```powershell
 node --version
 npm --version
+pnpm --version
 ```
 
-Node.js 版本太旧时，常见表现是依赖安装失败、`commander` 无法加载或 Vite/Vitest 报引擎不匹配。优先升级 Node.js，不要先删除 lockfile 重新安装。
+开发和 CI 以 Node.js 22、npm 10.9+、pnpm 11.24.0 为基线。使用 nvm 时，Linux / macOS 的 nvm 可在仓库根目录执行 `nvm use` 读取 `.nvmrc` 中的 `22`；nvm-windows 通常需要显式执行 `nvm use 22`。切换后重新打开终端，让 PATH 生效。
+
+Node.js 版本太旧时，常见表现是依赖安装失败、`commander` 无法加载或 Vite/Vitest 报引擎不匹配。优先切换到 Node.js 22，不要先删除 lockfile 重新安装。
 
 ### 平台差异总览
 
@@ -81,13 +91,13 @@ PowerShell 使用 `$env:NAME = 'value'` 设置当前终端环境变量；Bash / 
 
 ### 各系统安装 Node.js 的建议
 
-Questra 只要求 Node.js 20+，但建议使用仍在维护中的 LTS 版本。安装 Node.js 后再执行 `npm install -g questra`。
+Questra 要求 Node.js 22+，并以 Node.js 22 LTS 作为开发和 CI 基线。安装 Node.js 后再执行 `npm install -g questra@latest`。
 
 | 系统 | 推荐方式 | 说明 |
 | --- | --- | --- |
-| Windows | Node.js 官方 LTS 安装程序或 `winget install OpenJS.NodeJS.LTS` | 安装后重新打开 PowerShell，让 PATH 生效 |
-| Linux | nvm 安装 LTS，或发行版包管理器 | 服务器上建议固定 Node 主版本，不要让系统升级自动切换运行时 |
-| macOS | Homebrew `brew install node` 或 Node.js 官方 LTS 安装程序 | Apple Silicon 和 Intel 的 npm 全局目录可能不同，用 `which questra` 验证 |
+| Windows | nvm-windows 切换到 Node.js 22，或 Node.js 官方 22 LTS 安装程序 | 安装后重新打开 PowerShell，让 PATH 生效 |
+| Linux | nvm 安装并切换 Node.js 22，或发行版包管理器 | 服务器上建议固定 Node 主版本，不要让系统升级自动切换运行时 |
+| macOS | nvm 安装并切换 Node.js 22，或 Homebrew / Node.js 官方 22 LTS 安装程序 | Apple Silicon 和 Intel 的 npm 全局目录可能不同，用 `which questra` 验证 |
 
 `better-sqlite3` 通常会下载当前 Node 版本的预编译包。如果安装时进入本地编译：
 
@@ -102,7 +112,7 @@ Questra 只要求 Node.js 20+，但建议使用仍在维护中的 LTS 版本。�
 管理员只需要：
 
 ```powershell
-npm install -g questra
+npm install -g questra@latest
 ```
 
 全局安装做了两件事：把 Questra 的运行文件安装到 npm 全局目录，并把 `questra` 命令加入 PATH。默认数据跟随 Questra 安装根目录，不会因为你从不同目录执行命令而产生多份数据库。生产环境应设置 `QUESTRA_DATA_DIR`，把数据库放在 npm 包目录之外，避免升级或卸载包时误操作数据。
@@ -142,8 +152,8 @@ questra start
 - 执行所有未记录在 `schema_migrations` 的 SQL 迁移
 - 创建随机 Admin Token，并以受限权限写入 `.admin-token`
 - 首次打开管理页时显示初始化向导，创建唯一管理员账户和站点设置
-- 在用户目录的 `.questra\runtime.json` 记录 PID、端口、工作目录和配置路径
-- 将后台进程日志写入 `.questra\questra.log`
+- 默认在用户目录的 `.questra\runtime.json` 记录 PID、端口、工作目录和配置路径
+- 默认将后台进程日志写入 `.questra\questra.log`；设置 `QUESTRA_RUNTIME_FILE` 或 `QUESTRA_LOG_FILE` 后会改用指定路径
 
 启动成功后，先检查服务状态：
 
@@ -185,7 +195,7 @@ curl http://127.0.0.1:3000/api/health
 
 后台“设置”按类别分为：
 
-- **站点设置**：修改站点名称和图标；名称留空恢复为 `Questra`，图标支持 URL、站内路径或不超过 128 KB 的图片。
+- **站点设置**：修改站点名称和图标；名称留空恢复为 `Questra`，图标支持 URL、站内路径或小型图片。管理界面上传图片限制为 128 KB，API 还会校验图片地址或 Data URL 的长度。
 - **账号安全**：修改管理员昵称、登录账号和密码；系统不提供第二管理员账户。
 
 ### 2.4 配置端口、地址和数据库
@@ -222,7 +232,7 @@ module.exports = {
 | `logging` | 是否输出请求日志 | `true` |
 | `hooks` | 提交前后扩展钩子 | `{}` |
 
-命令行参数优先于环境变量，环境变量优先于配置文件：
+端口和监听地址的优先级为 `命令行参数` > `环境变量` > `survey.config.js` > `默认值`：
 
 ```text
 端口：--port > PORT > survey.config.js > 3000
@@ -291,7 +301,7 @@ export QUESTRA_ADMIN_TOKEN='请替换为长度足够的随机字符串'
 questra restart
 ```
 
-如果需要每次登录都生效，可把 `export` 写入 Linux 的 `~/.bashrc` / `~/.zshrc` 或 macOS 的 `~/.zshrc`；生产服务更推荐使用系统服务的 EnvironmentFile / plist，而不是写入交互式 shell 配置。
+如果需要每次登录都生效，可把 `export` 写入 Linux 的 `~/.bashrc` / `~/.zshrc` 或 macOS 的 `~/.zshrc`；生产服务更推荐使用系统服务的 EnvironmentFile / plist，而不是写入交互式 shell 配置。轮换由文件自动生成的 Token 前，先取消 `QUESTRA_ADMIN_TOKEN` 环境变量，否则环境变量仍会覆盖新文件。
 
 生产环境应通过 systemd EnvironmentFile、Windows 服务管理器、容器 Secret 或云密钥服务注入，不要把 Token 写进 Git。轮换自动生成的 Token 时，停止服务后删除数据库目录下的 `.admin-token`，再重新启动。
 
@@ -317,7 +327,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/srv/questra
-ExecStart=/usr/bin/questra start --foreground
+ExecStart=/usr/local/bin/questra start --foreground
 Environment=NODE_ENV=production
 EnvironmentFile=-/etc/questra/questra.env
 Restart=on-failure
@@ -337,6 +347,7 @@ QUESTRA_LOG_FILE=/var/log/questra/questra.log
 ```
 
 生产环境中请让日志轮转工具管理日志文件，并限制 Token 和数据库的读权限。
+`ExecStart` 必须替换为目标主机上 `command -v questra` 返回的绝对路径；如果使用 nvm，systemd 服务不会自动加载交互式 shell 配置，建议使用固定的系统级 Node/npm 安装或填写 nvm 下实际可执行文件路径。使用 `/run/questra/runtime.json` 或 `/var/log/questra/questra.log` 前，还要预先创建目录并授予服务账号写权限。
 
 #### Windows 任务计划程序
 
@@ -403,7 +414,7 @@ Questra 自身提供 HTTP。公网部署时建议让 Caddy、Nginx 或云负载�
 反向代理至少需要：
 
 - 转发普通 GET、POST、PUT、DELETE 请求
-- 保留 `Host` 和真实客户端 IP（限流按 IP 工作）
+- 正确转发 `Host`。Questra 默认未启用 Express 的 `trust proxy`，限流可能按反向代理的地址计算；当前版本没有对应的配置项，如需按真实客户端 IP 限流，需要在源码中为受信代理显式启用该设置，或在代理层完成限流。
 - 支持较大的 JSON 请求体（Questra 默认上限 256 KB）
 - 将 `/api/health` 暴露给探活系统
 
@@ -419,7 +430,7 @@ Questra 自身提供 HTTP。公网部署时建议让 Caddy、Nginx 或云负载�
 http://localhost:3000/admin?token=<Admin Token>
 ```
 
-React 管理端会把 Token 保存到当前标签页的 `sessionStorage`，并从地址栏移除。刷新同一标签页通常不需要重复输入；关闭标签页后需要重新使用完整链接或粘贴 Token。
+React 管理端会把 URL 中的 Token 保存到当前标签页的 `sessionStorage`，并从地址栏移除。使用账号密码登录后，HttpOnly 会话 Cookie 默认有效 7 天，刷新页面、关闭标签页甚至重启浏览器通常都不需要重新登录；仅使用兼容的 Token 链接时，Token 通常只保存在当前标签页，关闭标签页后需要再次使用完整链接或粘贴 Token。
 
 程序化调用管理 API 时使用：
 
@@ -645,9 +656,9 @@ module.exports = {
 
 注意：外部系统超时也会让本次提交失败。对非关键通知不要使用 `beforeSubmit`，否则填写者可能因为通知系统故障无法提交。
 
-### 4.4 afterSubmit：保存后的异步通知
+### 4.4 afterSubmit：保存后的通知
 
-`afterSubmit` 在答卷已经写入 SQLite 后执行。它适合：
+`afterSubmit` 在答卷已经写入 SQLite 后执行。Questra 会等待这个钩子的 Promise 完成后再返回提交响应，但不会因为钩子失败回滚已保存的数据。它适合：
 
 - 发送钉钉、企业微信或 Slack 通知
 - 把答卷同步到 CRM、表格或数据仓库
@@ -734,7 +745,7 @@ module.exports = {
 | 方法 | 路径 | 需要 Token | 作用 |
 | --- | --- | --- | --- |
 | `GET` | `/api/health` | 否 | 健康检查 |
-| `GET` | `/api/config` | 否 | 获取站点名称 |
+| `GET` | `/api/config` | 否 | 获取站点名称和图标 |
 | `GET` | `/api/setup/status` | 否 | 查询是否已完成首次初始化 |
 | `POST` | `/api/setup` | 否（仅首次） | 创建唯一管理员账户并保存站点初始设置 |
 | `POST` | `/api/auth/login` | 否 | 使用管理员账号密码登录并签发会话 Cookie |
@@ -743,17 +754,19 @@ module.exports = {
 | `GET` | `/api/surveys/:id` | 否 | 获取有效公开问卷 |
 | `POST` | `/api/surveys/:id/responses` | 否 | 提交答卷 |
 | `GET` | `/api/admin/dashboard` | 是 | 管理统计 |
-| `GET/PUT` | `/api/admin/settings`、`/api/admin/settings/site` | 是 | 查看或修改站点名称、站点图标 |
+| `GET` | `/api/admin/settings` | 是 | 查看站点名称、站点图标和管理员资料 |
+| `PUT` | `/api/admin/settings/site` | 是 | 修改站点名称、站点图标 |
 | `PUT` | `/api/admin/settings/account` | 是 | 修改唯一管理员昵称、账号或密码 |
 | `GET/POST` | `/api/admin/questions` | 是 | 查询或创建题目 |
 | `PUT/DELETE` | `/api/admin/questions/:id` | 是 | 更新或删除题目 |
 | `GET/POST` | `/api/admin/groups` | 是 | 查询或创建分组 |
+| `PUT/DELETE` | `/api/admin/groups/:id` | 是 | 修改或删除分组 |
 | `GET/POST` | `/api/admin/surveys` | 是 | 查询或创建问卷 |
 | `GET/PUT/DELETE` | `/api/admin/surveys/:id` | 是 | 查看、修改或删除问卷 |
 | `GET` | `/api/admin/surveys/:id/responses` | 是 | 查看答卷 |
 | `GET` | `/api/admin/surveys/:id/export` | 是 | 导出 CSV / JSON |
 
-管理写接口和公开提交接口都有内存限流。限流状态在进程重启后清空，不适合用作长期审计数据。
+管理写接口、初始化/登录接口和公开提交接口都有内存限流。限流状态在进程重启后清空，不适合用作长期审计数据。
 
 ### 5.2 curl 示例
 
@@ -799,7 +812,7 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `questra -V, --version` | 无 | 显示当前版本 |
 | `questra -h, --help` | 无 | 显示命令列表及所有子命令参数 |
 
-参数优先级为：命令行参数 > 环境变量 > `survey.config.js` > 默认值。运行 `questra --help` 可查看
+端口和监听地址的参数优先级为：命令行参数 > 环境变量 > `survey.config.js` > 默认值。运行 `questra --help` 可查看
 当前安装包实际生成的完整帮助。
 
 ## 6. 数据、迁移和备份
@@ -826,7 +839,7 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 questra migrate
 ```
 
-不要修改已经在线执行过的迁移文件。新增数据库结构时添加下一个编号，例如 `004_add_xxx.sql`，并在测试中覆盖升级路径。
+不要修改已经在线执行过的迁移文件。新增数据库结构时添加下一个编号，例如当前最新迁移为 `004_admin_accounts_settings.sql`，下一份应命名为 `005_add_xxx.sql`，并在测试中覆盖升级路径。
 
 ### 6.3 在线备份
 
@@ -850,7 +863,7 @@ Questra 使用 SQLite 在线备份 API，运行服务期间也能生成一致性
 
 ### 7.1 安装源码依赖
 
-仓库推荐使用 pnpm workspace 管理根项目和 `client/`，CI 以根目录的 `pnpm-lock.yaml` 复现依赖。先安装 Node.js 20+；Node.js 20 请搭配 pnpm 10，较新的 Node.js 可以使用其兼容的 pnpm 版本。使用 pnpm 时在仓库根目录执行：
+仓库推荐使用 pnpm workspace 管理根项目和 `client/`，CI 以根目录的 `pnpm-lock.yaml` 复现依赖。开发基线是 Node.js 22、pnpm 11 和 npm 10.9+。使用 pnpm 时在仓库根目录执行：
 
 ```powershell
 pnpm install --frozen-lockfile
@@ -926,24 +939,34 @@ pnpm run check
 pnpm run build
 ```
 
-`check` 包含仓库提交边界检查、后端 ESLint、Node.js 集成测试、前端 ESLint 和 Vitest。`build` 会生成 `client/dist`，生产 Express 会托管该目录。
+`check` 包含仓库提交边界检查、后端 ESLint、Node.js 集成测试、前端 ESLint 和 Vitest。后端测试由仓库脚本枚举 `test/*.test.js`，不依赖 Windows、Linux 或 macOS 的 Shell 通配符行为。`build` 会生成 `client/dist`，生产 Express 会托管该目录。
 
 npm 对应命令为 `npm run check` 和 `npm run build`。
 
 ### 7.5 发布 npm 包
 
-维护者发布前：
+版本递增和正式发布是两个步骤。推送到 `main` 并通过 CI 后，工作流自动执行 `npm version patch`，提交 `package.json`，并创建同名 Git 标签。需要手动调整版本时，可使用 `npm version patch`、`npm version minor` 或 `npm version major`，再运行检查并提交变更。
 
-```powershell
-npm login --registry=https://registry.npmjs.org
-npm whoami
-pnpm run release:check
-npm version patch
-npm publish --access public
-git push origin main --follow-tags
+正式发布的 GitHub Release + npm Trusted Publishing 流程见下一节。日常开发脚本兼容 npm 和 pnpm；`npm login`、`npm whoami` 和手动 `npm publish` 仅作为不使用 Trusted Publishing 时的备用发布方式。
+
+### 7.6 从标签发布 npm
+
+每次提交推送到 `main` 并通过质量检查（后端检查、前端检查、构建和发布白名单校验）后，CI 会执行以下流程：
+
+1. 用 npm 的 `version patch --no-git-tag-version` 将 `package.json` 的补丁版本加 1。
+2. 以 `github-actions[bot]` 身份提交版本变更，并使用 `[skip ci]` 防止版本提交再次触发递增循环。
+3. 创建与 `package.json` 完全相同的 Git 标签，例如版本 `0.2.1` 对应标签 `0.2.1`，再将提交和标签原子推送到仓库。
+
+自动标签 job 需要 `contents: write` 权限；若组织或分支保护策略禁止机器人回写 `main` 或创建标签，该 job 会失败，需要调整策略后重新运行。
+
+维护者首次启用前，需要在 npm 包的 **Trusted Publishers** 设置中添加 GitHub Actions，填写仓库所有者 `Dark2932`、仓库名 `Questra` 和工作流文件名 `publish.yaml`。然后在 GitHub 中选择该版本标签并正式发布 Release；`.github/workflows/publish.yaml` 会检查 Release 标签与 `package.json` 版本是否一致，运行完整发布检查，然后通过 npm Trusted Publishing 的 OIDC 身份发布到 npm Registry。工作流不读取或保存长期 `NPM_TOKEN`。
+
+这里的 `pnpm install` 只在 GitHub Actions 构建机上执行，用于安装测试、Lint 和前端构建所需的源码依赖；它不会进入发布包，也不是用户安装 Questra 的前置条件。发布完成后，用户直接使用 npm 即可：
+
+```bash
+npm install --global questra@latest
+questra start
 ```
-
-开发脚本兼容 npm 和 pnpm；上面的 `npm login`、`npm whoami`、`npm version` 和 `npm publish` 用于 npm Registry 身份、版本与发布流程。`npm version minor` 用于新增向后兼容功能，`npm version major` 用于不兼容变更。`npm publish` 会先执行 `prepublishOnly` 检查，再执行 `prepack` 重建前端。详细发布注意事项以 `package.json` 和 README 的当前内容为准。
 
 ## 8. 故障排查
 
@@ -1012,10 +1035,10 @@ tail -n 100 ~/.questra/questra.log
 
 ### 页面空白或加载旧界面
 
-检查 `client/dist/index.html` 是否存在并重新构建：
+源码开发时，检查 `client/dist/index.html` 是否存在并重新构建：
 
 ```powershell
 pnpm run build
 ```
 
-没有构建产物时，Questra 会回退到 `views/` 的兼容 EJS 界面，这是预期的降级行为。
+已通过 npm 安装的发布包已经包含 `client/dist`，不应在全局安装目录执行构建；若页面资源损坏，请重新安装或升级 `questra@latest`。只有源码仓库包含前端源码和构建脚本，才能使用上面的 `pnpm run build`（npm 开发者可替换为 `npm run build`）。没有构建产物时，Questra 会回退到 `views/` 的兼容 EJS 界面，这是预期的降级行为。

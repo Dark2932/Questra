@@ -1,0 +1,42 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: 使用 OIDC 发布 npm 包
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: 安装支持 OIDC 的 npm CLI
+        run: npm install --global npm@11.6.2
+      - run: pnpm install --frozen-lockfile
+      - name: 校验 Release 标签与包版本
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          test "$RELEASE_TAG" = "$PACKAGE_VERSION" || {
+            echo "Release 标签 $RELEASE_TAG 与 package.json 版本 $PACKAGE_VERSION 不一致"
+            exit 1
+          }
+      - name: 检查发布内容
+        run: pnpm run release:check
+      - name: 使用 OIDC 发布到 npm
+        run: npm publish --access public --provenance --ignore-scripts

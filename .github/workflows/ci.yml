@@ -5,53 +5,56 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    name: 后端测试 + Lint
+  quality:
+    name: 检查、构建与打包校验
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.5
+          version: 11.24.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check:repo
       - run: pnpm run lint
       - run: pnpm test
-
-  build:
-    name: 前端测试 + 构建
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.5
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - run: pnpm run lint:client
       - run: pnpm run test:client
       - run: pnpm run build
+      - name: 校验发布白名单
+        run: |
+          npm pack --dry-run --ignore-scripts
+          node -e "const p=require('./package.json');const f=p.files||[];if(!f.some((entry)=>entry.startsWith('client/dist'))){console.error('files 缺少 client/dist');process.exit(1)}else{console.log('✓ client/dist 已包含在发布包中')}"
 
-  pack:
-    name: pnpm 打包校验
+  tag:
+    name: 递增版本并创建标签
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') }}
+    needs: quality
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.5
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm pack --dry-run
-      - run: node -e "const p=require('./package.json');const f=p.files||[];if(!f.some((entry)=>entry.startsWith('client/dist'))){console.error('files 缺少 client/dist');process.exit(1)}else{console.log('✓ client/dist 已包含在发布包中')}"
+          node-version-file: .nvmrc
+      - name: 自动递增补丁版本并创建标签
+        shell: bash
+        run: |
+          npm version patch --no-git-tag-version
+          VERSION="$(node -p "require('./package.json').version")"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: bump Questra version to ${VERSION} [skip ci]"
+          git tag --annotate "$VERSION" --message "Questra ${VERSION}"
+          git push --atomic origin "HEAD:${GITHUB_REF_NAME}" "refs/tags/${VERSION}"
