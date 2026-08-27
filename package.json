@@ -27,8 +27,14 @@
     "url": "https://github.com/Dark2932/Questra/issues"
   },
   "scripts": {
+    "questra": "node bin/questra.js",
     "start": "node bin/questra.js start",
     "migrate": "node bin/questra.js migrate",
+    "status": "node bin/questra.js status",
+    "stop": "node bin/questra.js stop",
+    "restart": "node bin/questra.js restart",
+    "backup": "node bin/questra.js backup",
+    "help": "node bin/questra.js help",
     "dev": "node --watch bin/questra.js start --foreground",
     "test": "node scripts/run-tests.js",
     "test:client": "node scripts/run-client.js test",

@@ -1,75 +1,99 @@
 # Questra
 
-Questra 是一个轻量、自托管的问卷与考试系统。它使用 Express 提供服务、使用 SQLite 保存数据，适合个人服务器、内网调研、课程测验和小型团队，不依赖云服务。
+Questra 是一个轻量、自托管的问卷与考试系统。它使用单个 Node.js 服务提供管理后台、公开填写页面和 HTTP API，并使用 SQLite 保存数据，适合个人服务器、内网调研、课程测验和小型团队。
 
 ## 介绍
 
-- 用题库管理单选、多选、文本和判断题
-- 创建普通问卷，或创建支持自动判分的考试
-- 手动选题，或按题型和分组随机抽题
-- 通过公开链接收集答卷，并导出 CSV / JSON
-- 通过 `beforeSubmit`、`afterSubmit` 钩子接入 Webhook 和其他业务系统
+- 题库支持单选、多选、判断和文本题，可用分组整理和复用。
+- 可以创建普通问卷或自动判分考试，支持手动选题和按题型随机抽题。
+- 发布后的题目会保存为快照；以后修改题库不会改变已发布内容和历史成绩。
+- 答卷可在后台查看，并导出为 CSV 或 JSON。
+- 可通过 HTTP API 和提交钩子接入 Webhook、业务系统或数据平台。
 
-Questra 将题库题目复制为问卷快照。发布问卷后再修改题库，不会改变已经发布的问卷或历史成绩。
+Questra 不依赖 MySQL、Redis 等外部服务，适合单机部署。它不是多节点共享数据库的集群方案。
 
 ## 安装
 
-需要 Node.js 22 或更高版本。使用 nvm 时，在项目或终端中切换到 Node 22：
+Questra 需要 Node.js 22 或更高版本。此外建议您全局安装，以下三种方式选择一种即可。
+
+### 从 npm 全局安装
+
+适合大多数用户：
 
 ```text
-nvm use 22
+npm i -g questra@latest
+questra -V
 ```
 
-安装 Questra 最新版本：
+第一条命令安装最新正式版本并注册 `questra` 命令，第二条命令确认安装成功并返回安装版本。
+
+### 从 GitHub Release 全局安装
+
+从 [GitHub Releases](https://github.com/Dark2932/Questra/releases) 下载对应版本的 `questra-<版本>.tgz`，然后在下载目录执行：
 
 ```text
-npm install -g questra@latest
+npm i -g ./questra-0.3.0.tgz
+questra -V
 ```
 
-检查命令是否可用：
+将示例文件名替换为实际下载的版本。这种方式安装的是 Release 附件中的固定版本，适合离线保存或部署经过确认的构建产物。
+
+### 从源码构建
+
+> [!IMPORTANT]
+>
+> 这种方式不会注册全局命令，只能在项目文件夹内通过 npm 和 pnpm 运行，跟使用 `npm i questra` 安装效果一样。
+
+源码开发推荐 pnpm：
 
 ```text
-questra --version
+git clone https://github.com/Dark2932/Questra.git
+cd Questra
+pnpm install --frozen-lockfile
+pnpm run build
 ```
 
-如果系统提示无法识别 `questra`，重新打开终端并检查 npm 全局目录是否已加入 PATH。Windows、Linux 和 macOS 的安装命令相同；平台差异见 [深入部署与开发指南](docs/guide.md)。
+也可以使用 npm：
 
-## 启动
+```text
+git clone https://github.com/Dark2932/Questra.git
+cd Questra
+npm install
+npm run install:client
+npm run build
+```
 
-安装后可以从任意目录运行：
+## 快速开始
+
+全局安装或使用 Release 包后启动：
 
 ```text
 questra start
 ```
 
-默认监听 `http://localhost:3000`，浏览器打开：
+源码构建后启动：
+
+```text
+pnpm run start
+# 或 npm run start
+```
+
+> [!NOTE]
+>
+> `pnpm run start` 和 `npm run start` 对应 `questra start`；其他本地命令及开发流程见[开发与扩展](docs/development.md)。
+
+然后打开：
 
 ```text
 http://localhost:3000/admin
 ```
 
-首次访问会进入欢迎页和初始化向导，用于创建唯一管理员账号、密码、昵称和站点名称。
+首次访问会进入欢迎向导。依次创建唯一管理员账户、设置站点名称，然后按以下流程使用：
 
-默认数据保存在 Questra 安装根目录的 `data/questra.db`，不会因为执行命令的目录不同而产生多份数据库。生产环境建议把数据放到独立目录：
-
-```powershell
-$env:QUESTRA_DATA_DIR = 'D:\QuestraData'
-questra start
-```
-
-Linux / macOS：
-
-```bash
-export QUESTRA_DATA_DIR="$HOME/questra-data"
-questra start
-```
-
-自定义端口或配置文件：
-
-```text
-questra start --port 8080
-questra start --config C:\Questra\production\survey.config.js
-```
+1. 在“题库”中创建题目并按需建立分组。
+2. 在“问卷”中创建普通问卷或考试，选择题目、计分方式和截止时间。
+3. 复制 `/s/<问卷 ID>` 公开链接并发送给填写者。
+4. 在问卷数据页查看答卷、成绩，并导出 CSV 或 JSON。
 
 常用生命周期命令：
 
@@ -77,24 +101,17 @@ questra start --config C:\Questra\production\survey.config.js
 questra status
 questra restart
 questra stop
+questra backup
 ```
 
-## 如何使用
+生产环境应把数据放到安装目录之外，并在公网访问时配置 HTTPS。具体路径、环境变量和不同平台的部署方式见安装文档。
 
-1. 打开 `/admin`，按向导完成初始化并登录。
-2. 在“题库”中创建题目，可按分组整理。
-3. 在“问卷”中创建普通问卷或考试，选择题目或随机抽题。
-4. 保存后复制 `/s/<问卷 ID>` 公开链接发送给填写者。
-5. 在问卷详情中查看答卷，按需导出 CSV 或 JSON。
+## 补充
 
-考试支持两种计分方式：按题型权重计算总分，或为每道题设置固定分值。考试题目必须配置标准答案；普通问卷不要求标准答案。
+- [文档导航](docs/README.md)：按安装者、管理员和开发者选择阅读路径。
+- [安装与部署](docs/installation.md)：三种安装方式、配置、进程托管、升级、备份和排障。
+- [介绍与使用](docs/usage.md)：从欢迎向导到题库、问卷、考试、答卷和站点设置。
+- [开发与扩展](docs/development.md)：架构、源码开发、数据库迁移、提交钩子和发布流程。
+- [HTTP API](docs/api.md)：鉴权、端点、请求与响应示例。
 
-## 细节补充
-
-- 配置文件、环境变量、CLI 参数和跨平台部署：查看 [深入部署与开发指南](docs/guide.md)。
-- 数据库使用 SQLite WAL 模式，在线备份使用 `questra backup`；生产环境不要只复制 `.db` 文件。
-- 管理后台使用账号密码和会话 Cookie，兼容 Admin Token。不要公开 Token、数据库或 Webhook 密钥。
-- 源码开发推荐 pnpm 11，同时兼容 npm；详细测试、插件、API、迁移和发布流程见指南。
-- 推送到 `main` 并通过 CI 后，若没有手动修改版本号，工作流会自动递增补丁版本并创建同名 Git 标签；手动修改 `package.json` 的版本号也会直接创建对应标签。major/minor 版本变化会自动创建 GitHub Release，上传与 npm 发布完全相同的 `.tgz` 包，并通过 OIDC 发布到 npm。
-
-许可证： [MIT License](LICENSE)
+许可证：[MIT License](LICENSE)
