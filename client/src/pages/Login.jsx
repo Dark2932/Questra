@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Alert, Button, Card, Form, Input, Space, Typography, App } from 'antd';
 import { LockOutlined, LoginOutlined, UserOutlined } from '@ant-design/icons';
 import { api } from '../api';
 
 const { Title, Text } = Typography;
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, siteName }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { message } = App.useApp();
@@ -24,7 +25,7 @@ export default function Login({ onLogin }) {
 
   return <div className="auth-shell">
     <Card className="auth-card" bordered={false}>
-      <div className="auth-brand"><span className="brand-mark">Q</span><span>Questra</span></div>
+      <div className="auth-brand"><span className="brand-mark">Q</span><span className="auth-brand-name">{siteName || 'Questra'}</span></div>
       <Title level={2}>管理员登录</Title>
       <Text type="secondary">登录后管理题库、问卷和答卷数据</Text>
       {error && <Alert type="error" showIcon message={error} style={{ marginTop: 20 }} />}
@@ -34,8 +35,7 @@ export default function Login({ onLogin }) {
         <Button type="primary" htmlType="submit" icon={<LoginOutlined />} loading={loading} block>登录</Button>
       </Form>
       <Space direction="vertical" size={2} className="auth-note">
-        <Text type="secondary">旧版本也可以继续使用 Admin Token 登录。</Text>
-        <Text type="secondary">首次部署？请打开初始化页面完成设置。</Text>
+        <Link to="/unauthorized" className="auth-token-link">或使用 Admin Token 登录</Link>
       </Space>
     </Card>
   </div>;

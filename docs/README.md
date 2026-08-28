@@ -8,5 +8,6 @@
 | 完成初始化并管理题库、问卷和答卷 | [介绍与使用](usage.md) |
 | 修改源码、写扩展或参与发布 | [开发与扩展](development.md) |
 | 调用 HTTP 接口或编写自动化 | [HTTP API](api.md) |
+| 查找全局命令、选项或 package.json 脚本 | [命令参考](commands.md) |
 
 README 只提供最短上手路径；专题文档包含步骤背后的规则、边界和运维注意事项。

@@ -9,6 +9,7 @@ const { loadConfig } = require('../src/config');
 const { loadOrCreateAdminToken } = require('../src/admin-token');
 const { openDatabase, migrate } = require('../src/db');
 const { createApp } = require('../src/app');
+const { accessUrl } = require('../src/cli-output');
 const { spawn } = require('node:child_process');
 const {
   readRuntimeState,
@@ -74,6 +75,9 @@ program
       throw new Error('Questra 已在运行中（PID ' + existing.pid + '，端口 ' + existing.port + '）');
     }
     if (!options.foreground && process.env.QUESTRA_DAEMON !== '1') {
+      const config = loadConfig(options.config);
+      const port = Number(options.port || process.env.PORT || config.port || 3000);
+      const host = options.host || process.env.HOST || config.host || '0.0.0.0';
       const args = [path.resolve(__filename), 'start'];
       if (options.port) args.push('--port', String(options.port));
       if (options.host) args.push('--host', String(options.host));
@@ -91,6 +95,7 @@ program
       child.unref();
       fs.closeSync(logHandle);
       console.log('Questra 已在后台启动。');
+      console.log('访问地址: ' + accessUrl(host, port));
       console.log('日志文件: ' + logFile);
       return;
     }
@@ -106,7 +111,7 @@ program
     const printBanner = () => {
       console.log('');
       console.log('Questra 已启动');
-      console.log(`访问地址: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
+      console.log('访问地址: ' + accessUrl(host, port));
       console.log(`管理地址: http://localhost:${port}/admin?token=${adminToken}`);
       console.log(`Admin Token: ${adminToken}`);
       console.log(`数据目录: ${path.dirname(config.database)}`);
@@ -201,7 +206,7 @@ program
     }
     console.log('Questra 正在运行。');
     console.log('PID: ' + state.pid);
-    console.log('地址: http://localhost:' + state.port);
+    console.log('地址: ' + accessUrl(state.host, state.port));
     if (state.database) console.log('数据目录: ' + path.dirname(state.database));
     console.log('工作目录: ' + state.cwd);
     console.log('启动时间: ' + state.startedAt);

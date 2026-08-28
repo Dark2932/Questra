@@ -88,6 +88,8 @@ pnpm run start
 
 默认监听 `0.0.0.0:3000`。打开 `http://localhost:3000/admin` 后，欢迎向导会创建唯一管理员账户和初始站点设置。启动过程会自动创建数据目录、执行未应用迁移并生成持久化 Admin Token。
 
+启动成功后，Questra 会在终端打印“访问地址”。`start` 的后台模式会由启动命令直接打印该地址，前台模式会在服务监听成功后打印；如果指定了 `--host` 或 `--port`，输出会反映实际配置。后台进程的详细请求日志仍写入运行状态目录中的日志文件。
+
 ## 配置和数据目录
 
 Questra 从启动命令所在目录读取可选的 `survey.config.js`，但相对数据库路径以 Questra 安装根目录为基准。默认文件为安装根目录下的 `data/questra.db` 和 `.admin-token`。生产环境应设置 `QUESTRA_DATA_DIR`，使数据不随 npm 包升级或卸载：
@@ -124,6 +126,8 @@ module.exports = {
 端口和地址的优先级是命令行参数 > 环境变量 > 配置文件 > 默认值。常用环境变量还包括 `QUESTRA_ADMIN_TOKEN`、`QUESTRA_RUNTIME_FILE` 和 `QUESTRA_LOG_FILE`。Token 优先使用环境变量，其次读取数据目录的 `.admin-token`，最后才自动生成。
 
 ## 生命周期命令
+
+完整的全局命令、每个选项和源码脚本对应关系见[命令参考](commands.md)。下面只保留部署中最常用的生命周期操作：
 
 | 目的 | 全局安装 | 源码安装 |
 | --- | --- | --- |

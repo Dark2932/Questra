@@ -14,7 +14,7 @@ Questra 不依赖 MySQL、Redis 等外部服务，适合单机部署。它不是
 
 ## 安装
 
-Questra 需要 Node.js 22 或更高版本。此外建议您全局安装，以下三种方式选择一种即可。
+Questra 需要 Node.js 22 或更高版本。请按使用场景从以下三种方式中选择一种即可。
 
 ### 从 npm 全局安装
 
@@ -42,7 +42,7 @@ questra -V
 
 > [!IMPORTANT]
 >
-> 这种方式不会注册全局命令，只能在项目文件夹内通过 npm 和 pnpm 运行，跟使用 `npm i questra` 安装效果一样。
+> 这种方式不会注册全局命令，只能在项目文件夹内通过 npm 或 pnpm 运行；它使用与发布包相同的 CLI 入口，适合开发和调试。
 
 源码开发推荐 pnpm：
 
@@ -65,13 +65,13 @@ npm run build
 
 ## 快速开始
 
-全局安装或使用 Release 包后启动：
+全局安装后启动：
 
 ```text
 questra start
 ```
 
-源码构建后启动：
+或从源码构建后启动：
 
 ```text
 pnpm run start
@@ -80,13 +80,9 @@ pnpm run start
 
 > [!NOTE]
 >
-> `pnpm run start` 和 `npm run start` 对应 `questra start`；其他本地命令及开发流程见[开发与扩展](docs/development.md)。
+> `pnpm run start` 和 `npm run start` 对应 `questra start`；其他命令见[命令参考](docs/commands.md)，开发流程见[开发与扩展](docs/development.md)。
 
-然后打开：
-
-```text
-http://localhost:3000/admin
-```
+启动成功后，终端会打印访问地址；后台运行时地址也会保留在启动命令的输出中，日志文件记录在运行状态目录。
 
 首次访问会进入欢迎向导。依次创建唯一管理员账户、设置站点名称，然后按以下流程使用：
 
@@ -104,7 +100,9 @@ questra stop
 questra backup
 ```
 
-生产环境应把数据放到安装目录之外，并在公网访问时配置 HTTPS。具体路径、环境变量和不同平台的部署方式见安装文档。
+全部全局命令、选项以及源码目录中的 npm/pnpm 脚本见[命令参考](docs/commands.md)。
+
+生产环境应把数据放到安装目录之外，并在公网访问时配置 HTTPS。具体路径、环境变量和不同平台的部署方式见[安装与部署](docs/installation.md)。
 
 ## 补充
 

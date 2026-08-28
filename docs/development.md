@@ -31,7 +31,7 @@ npm run dev:all
 
 `dev:all` 以前台模式启动后端（3000）和 Vite 前端（5173），前端代理 `/api` 与 `/static` 到后端。只启动后端可用 `pnpm run dev` 或 `npm run dev`；只启动前端可用 `pnpm run dev:client` 或 `npm run dev:client`。
 
-生产构建使用 `pnpm run build` 或 `npm run build`，产物为 `client/dist`。源码 CLI 的脚本与全局子命令一致：`start`、`migrate`、`status`、`stop`、`restart`、`backup`、`help`；需要传参时在 npm/pnpm 脚本后加 `--`。
+生产构建使用 `pnpm run build` 或 `npm run build`，产物为 `client/dist`。源码 CLI 的脚本与全局子命令一致：`start`、`migrate`、`status`、`stop`、`restart`、`backup`、`help`；需要传参时在 npm/pnpm 脚本后加 `--`。全部脚本、参数和生命周期行为见[命令参考](commands.md)。
 
 ## 代码边界
 
@@ -84,7 +84,7 @@ module.exports = {
 
 ## API 开发
 
-完整端点、认证、数据结构和示例集中在 [HTTP API](api.md)。公开接口不得泄露标准答案或管理数据；管理写接口、登录和公开提交均有进程内限流。变更接口时应更新客户端 `client/src/api.js`、后端校验、测试和 API 文档，并明确错误状态和兼容行为。
+完整端点、认证、数据结构和示例集中在 [HTTP API](api.md)。公开接口不得泄露标准答案或管理数据；管理写接口、登录和公开提交均有进程内限流。变更接口时应更新客户端 `client/src/api.js`、后端校验、测试和 API 文档，并明确错误状态和兼容行为。命令行参数和环境变量不在 API 文档中重复，统一维护在[命令参考](commands.md)和[安装与部署](installation.md)。
 
 ## 测试和发布
 

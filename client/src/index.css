@@ -65,6 +65,10 @@ body {
   font-size: 18px;
   font-weight: 750;
 }
+.auth-brand-name {
+  max-width: min(320px, calc(100vw - 120px));
+  overflow-wrap: anywhere;
+}
 .auth-brand .brand-mark {
   width: 38px;
   height: 38px;
@@ -76,8 +80,27 @@ body {
   font-size: 17px;
   font-weight: 800;
 }
+.auth-card .ant-input,
+.auth-card .ant-input-affix-wrapper,
+.auth-card .ant-input-affix-wrapper .ant-input {
+  background-color: transparent;
+}
+.auth-card input:-webkit-autofill,
+.auth-card input:-webkit-autofill:hover,
+.auth-card input:-webkit-autofill:focus,
+.auth-card input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--ant-color-text);
+  -webkit-box-shadow: 0 0 0 1000px var(--ant-color-bg-container) inset !important;
+  box-shadow: 0 0 0 1000px var(--ant-color-bg-container) inset !important;
+  background-color: transparent !important;
+}
+.auth-card input:-moz-autofill {
+  background-color: transparent !important;
+  color: var(--ant-color-text);
+}
 .setup-step { max-width: 520px; margin: 36px auto 8px; }
 .auth-note { width: 100%; margin-top: 20px; text-align: center; }
+.auth-token-link { color: var(--ant-color-primary); }
 
 /* Keep dialogs fixed while long forms scroll inside the body. */
 .ant-modal-wrap { overflow: hidden; }
@@ -85,7 +108,11 @@ body {
 .ant-modal-body { max-height: calc(100vh - 190px); overflow-y: auto; }
 
 ::selection {
-  background: #111;
+  background: #1677ff;
+  color: #fff;
+}
+html.dark ::selection {
+  background: #4096ff;
   color: #fff;
 }
 

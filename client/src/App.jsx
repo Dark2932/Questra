@@ -13,6 +13,7 @@ const Responses = lazy(() => import('./pages/admin/Responses'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const SetupWizard = lazy(() => import('./pages/SetupWizard'));
 const Login = lazy(() => import('./pages/Login'));
+const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const Survey = lazy(() => import('./pages/Survey'));
 
 function useAdminAccess() {
@@ -62,7 +63,7 @@ function AdminGate({ access, children }) {
 function AnimatedRoutes({ access, theme, resolvedTheme, setTheme }) {
   return <Suspense fallback={<CenterLoading />}><Routes>
     <Route path="/admin/setup" element={access.loading ? <CenterLoading /> : access.setup?.initialized ? <Navigate to="/admin/login" replace /> : <SetupWizard onComplete={access.refresh} />} />
-    <Route path="/admin/login" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Login onLogin={access.refresh} />} />
+    <Route path="/admin/login" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Login onLogin={access.refresh} siteName={access.setup?.siteName} />} />
     <Route path="/admin" element={<AdminGate access={access}><AdminLayout authenticated={access.authenticated} site={access.setup} user={access.user} onLogout={access.logout} theme={theme} resolvedTheme={resolvedTheme} onThemeChange={setTheme} /></AdminGate>}>
       <Route index element={<Dashboard />} />
       <Route path="questions" element={<Questions />} />
@@ -71,7 +72,7 @@ function AnimatedRoutes({ access, theme, resolvedTheme, setTheme }) {
       <Route path="settings" element={<Settings onLogout={access.logout} onRefresh={access.refresh} />} />
     </Route>
     <Route path="/s/:id" element={<Survey />} />
-    <Route path="/unauthorized" element={<Navigate to="/admin/login" replace />} />
+    <Route path="/unauthorized" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Unauthorized />} />
     <Route path="*" element={<Navigate to="/admin" replace />} />
   </Routes></Suspense>;
 }
