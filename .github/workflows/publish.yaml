@@ -1,12 +1,13 @@
-name: Publish to npm
+name: Publish Questra package
 
 on:
   release:
+    # CI 创建的 Release 和维护者在 GitHub 手动发布的 Release 都走同一个 job。
     types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: 要发布的 Git 标签，必须与 package.json 版本一致
+        description: 已发布的 Release 标签；必须与 package.json 版本一致
         required: true
         type: string
 
@@ -20,7 +21,10 @@ permissions:
 
 jobs:
   publish:
-    name: 打包、上传 Release 附件并发布 npm
+    name: 校验、打包并发布 npm
+    # CI 创建的 bot Release 由 ci.yml 显式调度；人工发布的 Release 由 release.published 触发。
+    # 两种入口在这里汇合，避免 CI Release 同时触发事件和手动调度造成重复发布。
+    if: ${{ github.event_name != 'release' || github.event.release.author.login != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
@@ -39,19 +43,30 @@ jobs:
       - name: 安装支持 OIDC 的 npm CLI
         run: npm install --global npm@11.6.2
       - run: pnpm install --frozen-lockfile
-      - name: 校验 Release 标签与包版本
+      - name: 校验 Release、标签与包版本
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$RELEASE_TAG" || {
+            echo '未解析到 Release 标签'
+            exit 1
+          }
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
           test "$RELEASE_TAG" = "$PACKAGE_VERSION" || {
             echo "Release 标签 $RELEASE_TAG 与 package.json 版本 $PACKAGE_VERSION 不一致"
             exit 1
           }
-          gh release view "$RELEASE_TAG" >/dev/null || {
-            echo "GitHub Release $RELEASE_TAG 不存在"
+          RELEASE_STATE="$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease --jq '[.isDraft, .isPrerelease] | @tsv')"
+          read -r IS_DRAFT IS_PRERELEASE <<< "$RELEASE_STATE"
+          if [[ "$IS_DRAFT" = true ]]; then
+            echo "Release $RELEASE_TAG 仍是草稿，不能发布"
             exit 1
-          }
+          fi
+          if [[ "$IS_PRERELEASE" = true ]]; then
+            echo "Release $RELEASE_TAG 是预发布版本，当前工作流不发布预发布包"
+            exit 1
+          fi
+          echo "Release $RELEASE_TAG 已确认，将使用统一发布流程"
         env:
           GH_TOKEN: ${{ github.token }}
       - name: 检查发布内容
@@ -64,7 +79,7 @@ jobs:
           PACKAGE_FILE="$(npm pack --ignore-scripts --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s)[0].filename))")"
           test -f "$PACKAGE_FILE"
           echo "file=${PACKAGE_FILE}" >> "$GITHUB_OUTPUT"
-      - name: 上传与 npm 发布一致的 Release 附件
+      - name: 将同一包文件上传到 Release
         env:
           GH_TOKEN: ${{ github.token }}
           PACKAGE_FILE: ${{ steps.pack.outputs.file }}

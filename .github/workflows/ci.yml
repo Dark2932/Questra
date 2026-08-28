@@ -26,16 +26,21 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run check:repo
-      - run: pnpm run lint
-      - run: pnpm test
-      - run: pnpm run lint:client
-      - run: pnpm run test:client
+      - name: 运行完整检查
+        run: pnpm run check
       - run: pnpm run build
       - name: 校验发布白名单
         run: |
+          set -euo pipefail
           npm pack --dry-run --ignore-scripts
-          node -e "const p=require('./package.json');const f=p.files||[];if(!f.some((entry)=>entry.startsWith('client/dist'))){console.error('files 缺少 client/dist');process.exit(1)}else{console.log('✓ client/dist 已包含在发布包中')}"
+          node - <<'NODE'
+          const files = require('./package.json').files || [];
+          if (!files.some((entry) => entry === 'client/dist' || entry.startsWith('client/dist/'))) {
+            console.error('files 缺少 client/dist');
+            process.exit(1);
+          }
+          console.log('client/dist 已包含在发布包中');
+          NODE
 
   version:
     name: 确定版本、创建标签和 Release
@@ -58,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Runner 默认没有 Git 身份；无论是自动提交还是 annotated tag 都需要它。
+          # 版本提交和 annotated tag 都需要明确的 Git 身份。
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -76,20 +81,34 @@ jobs:
           }
 
           if [[ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]]; then
-            npm version patch --no-git-tag-version
+            # 未手动改版本时，CI 才自动递增 patch；npm version 只修改工作区文件。
+            npm version patch --no-git-tag-version >/dev/null
             VERSION="$(node -p "require('./package.json').version")"
-            git add package.json
-            git commit -m "chore: bump Questra version to ${VERSION} [skip ci]"
             PUSH_BRANCH=true
           else
+            # package.json 已手动改版本时，直接使用该版本，绝不再次递增 patch。
             VERSION="$CURRENT_VERSION"
             PUSH_BRANCH=false
           fi
 
-          git rev-parse --verify --quiet "refs/tags/${VERSION}" >/dev/null && {
-            echo "标签 ${VERSION} 已存在，请先设置一个尚未使用的版本号"
+          # 同时检查本地和 origin，避免手动版本与已有标签重合时创建新标签。
+          if git rev-parse --verify --quiet "refs/tags/${VERSION}" >/dev/null; then
+            echo "标签 ${VERSION} 已存在，取消本次打标签；请修改 package.json 后重试。"
             exit 1
-          }
+          fi
+          if ! REMOTE_TAG="$(git ls-remote --quiet origin "refs/tags/${VERSION}")"; then
+            echo "无法检查 origin 上的标签 ${VERSION}，为避免重复发布而取消本次打标签。"
+            exit 1
+          fi
+          if [[ -n "$REMOTE_TAG" ]]; then
+            echo "标签 ${VERSION} 已存在，取消本次打标签；请修改 package.json 后重试。"
+            exit 1
+          fi
+
+          if [[ "$PUSH_BRANCH" = true ]]; then
+            git add package.json
+            git commit -m "chore: bump Questra version to ${VERSION} [skip ci]"
+          fi
 
           git tag --annotate "$VERSION" --message "Questra ${VERSION}"
           if [[ "$PUSH_BRANCH" = true ]]; then
@@ -122,10 +141,11 @@ jobs:
             --title "Questra ${VERSION}" \
             --generate-notes
 
-      - name: 触发 npm 发布并上传 Release 包
+      - name: 触发统一 npm 发布工作流
         if: ${{ steps.version.outputs.create_release == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         shell: bash
+        # CI 创建的 Release 使用 workflow_dispatch；publish.yaml 会跳过同一 bot 产生的 release 事件，避免重复发布。
         run: gh workflow run publish.yaml --ref main --field tag="$VERSION"

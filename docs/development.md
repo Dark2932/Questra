@@ -98,4 +98,6 @@ pnpm run release:check
 
 npm 可分别使用对应的 `npm run` 命令。`check` 覆盖仓库边界、后端 lint/测试、前端 lint/测试；`release:check` 还验证发布包内容。CI 在 Node.js 22 和 pnpm 11 上执行，发布包必须包含 `client/dist`、迁移、视图和文档，但不能包含数据库、Token、日志、依赖目录或测试缓存。
 
-版本发布由 GitHub Actions 根据 `package.json` 版本创建标签；major/minor 版本会创建 Release，发布工作流把同一个 `.tgz` 上传到 Release 并通过 npm Trusted Publishing 发布。正式发布前不要在本地执行真实 `npm publish`，也不要把 Registry 凭据写入仓库。
+版本发布由 GitHub Actions 根据 `package.json` 版本创建标签：版本未手动修改时自动递增 patch，手动修改时直接使用新版本且不再递增；如果本地或远程已经存在同名标签，本次发布会在打标签前终止。major/minor 版本会创建 Release，patch 版本只创建标签，除非维护者随后在 GitHub 发布对应 Release。
+
+CI 创建的 Release 使用 `workflow_dispatch` 调用发布工作流；维护者在 GitHub 手动发布匹配版本的非草稿、非预发布 Release 时，`release.published` 会进入同一个校验、打包、上传附件和 npm Trusted Publishing 流程。正式发布前不要在本地执行真实 `npm publish`，也不要把 Registry 凭据写入仓库。
