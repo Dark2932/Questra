@@ -25,6 +25,20 @@ body {
   overflow-x: auto;
   scrollbar-width: none;
 }
+.admin-header-main { min-width: 0; flex: 1; overflow: hidden; }
+.admin-header-actions { flex-shrink: 0; }
+.admin-nav-more { display: none; }
+.emoji-picker { display: grid; gap: 8px; width: 320px; max-width: calc(100vw - 48px); }
+.upload-help { display: block; font-size: 12px; line-height: 1.4; }
+.site-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.site-identity-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto 190px 64px;
+  gap: 20px;
+  align-items: start;
+}
+.site-icon-as-initial { padding-top: 30px; white-space: nowrap; }
+.site-identity-preview { padding-top: 30px; }
 
 .admin-nav::-webkit-scrollbar { display: none; }
 .admin-nav a {
@@ -43,6 +57,31 @@ body {
 }
 
 .brand-mark { line-height: 1; vertical-align: middle; }
+.ant-avatar img { object-fit: contain; }
+
+.ant-color-picker-rgb-input .ant-input-number-handler-wrap,
+.ant-color-picker-rgb-input .ant-input-number-actions {
+  display: none;
+}
+.ant-color-picker-rgb-input input[type='number'] {
+  -moz-appearance: textfield;
+}
+.ant-color-picker-rgb-input input[type='number']::-webkit-inner-spin-button,
+.ant-color-picker-rgb-input input[type='number']::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+@media (max-width: 900px) {
+  .admin-nav a { display: none; }
+  .admin-nav-more { display: inline-flex; align-items: center; justify-content: center; }
+}
+@media (max-width: 640px) {
+  .admin-user-name { display: none; }
+  .site-identity-row { grid-template-columns: 1fr; gap: 0; }
+  .site-icon-as-initial, .site-identity-preview { padding-top: 0; }
+  .site-identity-preview { align-items: flex-start; margin-bottom: 24px; }
+}
 
 .auth-shell, .setup-shell {
   min-height: 100vh;
@@ -105,7 +144,12 @@ body {
 /* Keep dialogs fixed while long forms scroll inside the body. */
 .ant-modal-wrap { overflow: hidden; }
 .ant-modal { top: 24px; margin: 0 auto; padding-bottom: 0; }
-.ant-modal-body { max-height: calc(100vh - 190px); overflow-y: auto; }
+.ant-modal .ant-modal-body {
+  width: calc(100% + 12px);
+  max-height: calc(100vh - 190px);
+  padding-inline-end: 20px;
+  overflow-y: auto;
+}
 
 ::selection {
   background: #1677ff;
@@ -116,18 +160,25 @@ html.dark ::selection {
   color: #fff;
 }
 
-::-webkit-scrollbar {
+.ant-modal-body::-webkit-scrollbar,
+.ant-modal-body *::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-::-webkit-scrollbar-track {
+.ant-modal-body::-webkit-scrollbar-track,
+.ant-modal-body *::-webkit-scrollbar-track {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
+.ant-modal-body::-webkit-scrollbar-corner,
+.ant-modal-body *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.ant-modal-body::-webkit-scrollbar-thumb,
+.ant-modal-body *::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
+.ant-modal-body::-webkit-scrollbar-thumb:hover,
+.ant-modal-body *::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
-

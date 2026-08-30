@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { Buffer } = require('node:buffer');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -21,7 +22,7 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
   t.after(() => { server.close(); db.close(); fs.rmSync(tempDir, { recursive: true, force: true }); });
 
   const initial = await fetch(`${baseUrl}/api/setup/status`);
-  assert.deepEqual(await json(initial), { initialized: false, siteName: 'Questra', siteIcon: '' });
+  assert.deepEqual(await json(initial), { initialized: false, siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#0D9488' });
 
   const setup = await fetch(`${baseUrl}/api/setup`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -48,6 +49,8 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
     body: JSON.stringify({ username: 'admin', nickname: '新昵称' })
   });
   assert.equal((await json(nickname)).requiresLogin, false);
+  const renamedMe = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: setupCookie } });
+  assert.equal((await json(renamedMe)).user.nickname, '新昵称');
 
   const invalidPassword = await fetch(`${baseUrl}/api/admin/settings/account`, {
     method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
@@ -57,11 +60,35 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
 
   const updateSite = await fetch(`${baseUrl}/api/admin/settings/site`, {
     method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
-    body: JSON.stringify({ siteName: '我的站点', siteIcon: '/static/icon.png' })
+    body: JSON.stringify({ siteName: '我的站点', siteIcon: '/static/icon.png', siteIconAsInitial: true, siteInitial: '站点标识', siteInitialColor: 'rgb(255, 0, 128)', themeColor: '#336699' })
   });
-  assert.equal((await json(updateSite)).site.siteName, '我的站点');
+  const updatedSite = await json(updateSite);
+  assert.equal(updatedSite.site.siteName, '我的站点');
+  assert.equal(updatedSite.site.siteIconAsInitial, true);
+  assert.equal(updatedSite.site.siteInitial, '站点标识');
   const config = await fetch(`${baseUrl}/api/config`);
-  assert.deepEqual(await json(config), { siteName: '我的站点', siteIcon: '/static/icon.png' });
+  assert.deepEqual(await json(config), { siteName: '我的站点', siteIcon: '/static/icon.png', siteIconAsInitial: true, siteInitial: '站点标识', siteInitialColor: 'rgb(255, 0, 128)', themeColor: '#336699' });
+
+  const uploadedIcon = `data:image/png;base64,${Buffer.alloc(300 * 1024).toString('base64')}`;
+  const uploadSiteIcon = await fetch(`${baseUrl}/api/admin/settings/site`, {
+    method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ siteIcon: uploadedIcon })
+  });
+  assert.equal(uploadSiteIcon.status, 200);
+  assert.equal((await json(uploadSiteIcon)).site.siteIcon, uploadedIcon);
+
+  const restoreSite = await fetch(`${baseUrl}/api/admin/settings/site`, {
+    method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488' })
+  });
+  const restoredSite = (await json(restoreSite)).site;
+  assert.deepEqual(restoredSite, { siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#336699' });
+
+  const restorePersonalization = await fetch(`${baseUrl}/api/admin/settings/site`, {
+    method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ themeColor: '#0D9488' })
+  });
+  assert.deepEqual((await json(restorePersonalization)).site, { siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#0D9488' });
 
   const login = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },

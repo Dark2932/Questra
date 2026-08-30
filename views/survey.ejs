@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title><%= survey.title %> · <%= siteName %></title><link rel="stylesheet" href="/static/styles.css"></head>
-<body class="survey-body">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title><%= survey.title %> - <%= siteName %></title><link rel="icon" href="<%= siteIcon || defaultSiteIcon %>"><link rel="stylesheet" href="/static/styles.css"></head>
+<body class="survey-body" data-theme="system" style="--questra-theme-color:<%= themeColor || '#0D9488' %>">
   <main class="survey-shell">
-    <header class="survey-intro"><span class="survey-brand"><%= siteName %> · <%= survey.kind === 'exam' ? '考试' : '问卷' %></span><h1><%= survey.title %></h1><% if (survey.description) { %><p><%= survey.description %></p><% } %><div class="survey-meta"><span><%= survey.questions.length %> 道题</span><% if (survey.kind === 'exam') { %><span>满分 <%= survey.maxScore %> 分</span><% } %><% if (survey.expiresAt) { %><span>截止 <%= new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false }) %></span><% } %></div></header>
+    <div class="survey-theme-control" role="group" aria-label="问卷页面主题"><button type="button" data-theme-choice="light" title="浅色" aria-label="浅色">☀</button><button type="button" data-theme-choice="dark" title="深色" aria-label="深色">☾</button><button type="button" data-theme-choice="system" title="跟随系统" aria-label="跟随系统">◐</button></div>
+    <header class="survey-intro"><h1><%= survey.title %></h1><% if (survey.description) { %><p><%= survey.description %></p><% } %><div class="survey-meta"><span><%= survey.questions.length %> 道题</span><% if (survey.kind === 'exam') { %><span>满分 <%= survey.maxScore %> 分</span><% } %><% if (survey.expiresAt) { %><span>截止 <%= new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false }) %></span><% } %></div></header>
     <form id="public-survey-form" data-survey-id="<%= survey.id %>" data-kind="<%= survey.kind %>">
       <% survey.questions.forEach((question, index) => { %>
         <fieldset class="question-block" data-question-id="<%= question.id %>" data-type="<%= question.type %>">
@@ -20,5 +21,21 @@
     <section id="thank-you" class="thank-you" hidden><span class="success-mark">✓</span><h2 id="result-title">感谢参与</h2><p id="result-message">你的答卷已成功提交。</p><div id="exam-score" class="exam-score" hidden><strong id="score-value">0</strong><span> / <b id="max-score-value">0</b> 分</span></div></section>
   </main>
   <script src="/static/survey.js"></script>
+  <script>
+    (() => {
+      const body = document.body;
+      const key = 'questra-survey-theme';
+      const choices = [...document.querySelectorAll('[data-theme-choice]')];
+      const apply = (value) => {
+        const dark = value === 'dark' || (value === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        body.dataset.theme = dark ? 'dark' : 'light';
+        choices.forEach((button) => button.classList.toggle('active', button.dataset.themeChoice === value));
+      };
+      let value = localStorage.getItem(key) || 'system';
+      apply(value);
+      choices.forEach((button) => button.addEventListener('click', () => { value = button.dataset.themeChoice; localStorage.setItem(key, value); apply(value); }));
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (value === 'system') apply(value); });
+    })();
+  </script>
 </body>
 </html>

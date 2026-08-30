@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title><%= title %> · <%= siteName %></title>
+  <title><%= title %> - <%= siteName %></title>
+  <link rel="icon" href="<%= siteIcon || defaultSiteIcon %>">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body class="admin-body">
+<body class="admin-body" style="--questra-theme-color:<%= themeColor || '#0D9488' %>">
   <header class="admin-header">
-    <a class="brand" href="/admin"><span class="brand-mark">Q</span><span><%= siteName %></span></a>
+    <a class="brand" href="/admin"><span class="brand-mark<%= siteIconAsInitial ? ' image' : '' %>" style="background:<%= siteInitialColor || '#0D9488' %>"><% if (siteIconAsInitial) { %><img src="<%= siteIcon || defaultSiteIcon %>" alt=""><% } else { %><%= Array.from(siteInitial || siteName || 'Questra')[0] %><% } %></span><span><%= siteName %></span></a>
     <nav aria-label="管理导航">
       <a class="<%= current === 'dashboard' ? 'active' : '' %>" href="/admin">仪表盘</a>
       <a class="<%= current === 'questions' ? 'active' : '' %>" href="/admin/questions">题库</a>

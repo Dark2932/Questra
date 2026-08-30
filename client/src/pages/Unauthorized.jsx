@@ -1,59 +1,48 @@
-﻿import { useState } from 'react';
-import { Result, Button, Input, App } from 'antd';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Alert, Button, Card, Form, Input, Space, Typography, App } from 'antd';
+import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
+import SiteMark from '../components/SiteMark';
 
-export default function Unauthorized() {
-  const [value, setValue] = useState('');
+const { Title, Text } = Typography;
+
+export default function Unauthorized({ siteName, siteInitial, siteInitialColor, siteIcon, siteIconAsInitial }) {
   const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState('');
   const { message } = App.useApp();
 
-  const handleSubmit = async () => {
-    const token = value.trim();
-    if (!token) {
-      message.warning('请输入 Admin Token');
-      return;
-    }
+  const submit = async ({ token: rawToken }) => {
+    const token = rawToken.trim();
     setVerifying(true);
+    setError('');
     try {
-      // 先向后端验证 Token，通过后才写入 sessionStorage。
-      const ok = await fetch('/api/admin/dashboard', {
+      const response = await fetch('/api/admin/dashboard', {
         headers: { authorization: `Bearer ${token}` },
       });
-      if (ok.ok) {
-        sessionStorage.setItem('questra_admin_token', token);
-        message.success('Token 已验证');
-        // App 的 token state 在挂载时读取一次，这里整页刷新让应用带着新 Token 重新挂载。
-        window.location.href = '/admin';
-      } else {
-        message.error('Token 无效或已过期，请检查后重试');
-      }
-    } catch {
-      message.error('无法连接服务器，请稍后重试');
+      if (!response.ok) throw new Error('Admin Token 无效或已过期，请检查后重试');
+      sessionStorage.setItem('questra_admin_token', token);
+      message.success('登录成功');
+      window.location.href = '/admin';
+    } catch (requestError) {
+      setError(requestError.message || '无法连接服务器，请稍后重试');
     } finally {
       setVerifying(false);
     }
   };
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
-      <Result
-        status="403"
-        title="需要管理授权"
-        subTitle="服务器重启后 Admin Token 会保留在数据目录。请粘贴最新的 Admin Token，或使用带 ?token= 参数的管理链接。"
-        extra={[
-          <Input.Password
-            key="token"
-            placeholder="粘贴 Admin Token"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onPressEnter={handleSubmit}
-            style={{ maxWidth: 320, margin: '0 auto' }}
-            autoComplete="off"
-          />,
-          <Button key="submit" type="primary" disabled={verifying} onClick={handleSubmit} style={{ marginTop: 12 }}>
-            验证并进入
-          </Button>,
-        ]}
-      />
-    </div>
-  );
+  return <div className="auth-shell">
+    <Card className="auth-card" bordered={false}>
+      <div className="auth-brand"><SiteMark className="brand-mark" size={38} borderRadius={10} fontSize={17} siteName={siteName} siteInitial={siteInitial} siteInitialColor={siteInitialColor} siteIcon={siteIcon} siteIconAsInitial={siteIconAsInitial} /><span className="auth-brand-name">{siteName || 'Questra'}</span></div>
+      <Title level={2}>管理员登录</Title>
+      <Text type="secondary">请输入有效的的 Admin Token</Text>
+      {error && <Alert type="error" showIcon message={error} style={{ marginTop: 20 }} />}
+      <Form layout="vertical" onFinish={submit} requiredMark={false} style={{ marginTop: 24 }}>
+        <Form.Item name="token" label="Admin Token" rules={[{ required: true, whitespace: true, message: '请输入 Admin Token' }]}><Input.Password prefix={<KeyOutlined />} autoComplete="off" placeholder="Admin Token" /></Form.Item>
+        <Button type="primary" htmlType="submit" icon={<LoginOutlined />} loading={verifying} block>登录</Button>
+      </Form>
+      <Space direction="vertical" size={2} className="auth-note">
+        <Link to="/admin/login" className="auth-token-link">使用账号与密码登录</Link>
+      </Space>
+    </Card>
+  </div>;
 }

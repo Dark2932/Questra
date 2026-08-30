@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { Alert, Button, Card, Form, Input, Space, Typography, App } from 'antd';
 import { LockOutlined, LoginOutlined, UserOutlined } from '@ant-design/icons';
 import { api } from '../api';
+import SiteMark from '../components/SiteMark';
 
 const { Title, Text } = Typography;
 
-export default function Login({ onLogin, siteName }) {
+export default function Login({ onLogin, siteName, siteInitial, siteInitialColor, siteIcon, siteIconAsInitial }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { message } = App.useApp();
@@ -25,7 +26,7 @@ export default function Login({ onLogin, siteName }) {
 
   return <div className="auth-shell">
     <Card className="auth-card" bordered={false}>
-      <div className="auth-brand"><span className="brand-mark">Q</span><span className="auth-brand-name">{siteName || 'Questra'}</span></div>
+      <div className="auth-brand"><SiteMark className="brand-mark" size={38} borderRadius={10} fontSize={17} siteName={siteName} siteInitial={siteInitial} siteInitialColor={siteInitialColor} siteIcon={siteIcon} siteIconAsInitial={siteIconAsInitial} /><span className="auth-brand-name">{siteName || 'Questra'}</span></div>
       <Title level={2}>管理员登录</Title>
       <Text type="secondary">登录后管理题库、问卷和答卷数据</Text>
       {error && <Alert type="error" showIcon message={error} style={{ marginTop: 20 }} />}

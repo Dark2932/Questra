@@ -1,23 +1,32 @@
 ﻿import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Typography, Result, Spin, Statistic, Card, Space, Divider, Button, Avatar } from 'antd';
-import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useMemo } from 'react';
+import { Typography, Result, Spin, Statistic, Card, Space, Divider, Button, ConfigProvider, Segmented, Tooltip, theme as antTheme } from 'antd';
+import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, ReloadOutlined, SettingOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';
 import { api } from '../api';
+import { useTheme } from '../hooks/useTheme';
+import { DEFAULT_SITE_ICON_URL } from '../lib/siteIcon';
+import { formatPageTitle } from '../lib/pageTitle';
 import SurveyForm from './SurveyForm';
 
 const { Text, Title, Paragraph } = Typography;
 
-export default function Survey() {
+export default function Survey({ siteName }) {
   const { id } = useParams();
   const [survey, setSurvey] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [examResult, setExamResult] = useState(null);
+  const { theme, resolvedTheme, setTheme } = useTheme('questra-survey-theme', false);
 
   useEffect(() => {
     api.getPublicSurvey(id).then(setSurvey).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    document.title = formatPageTitle(survey?.title || '问卷', survey?.siteName || siteName);
+  }, [siteName, survey]);
 
   const handleSubmit = async (answers) => {
     const result = await api.submitResponse(id, answers);
@@ -26,31 +35,72 @@ export default function Survey() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const containerStyle = { minHeight: '100vh', background: 'var(--ant-color-bg-layout)', display: 'flex', justifyContent: 'center', padding: '48px 16px' };
+  const containerStyle = {
+    minHeight: '100vh',
+    background: resolvedTheme === 'dark' ? '#000000' : '#f5f5f7',
+    colorScheme: resolvedTheme,
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '48px 16px',
+    position: 'relative',
+  };
+  const themeColor = survey?.themeColor || '#0D9488';
+  const surveyTheme = useMemo(() => ({
+    algorithm: resolvedTheme === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+    token: {
+      colorPrimary: themeColor,
+      colorLink: themeColor,
+      colorBgBase: resolvedTheme === 'dark' ? '#000000' : '#ffffff',
+      colorBgLayout: resolvedTheme === 'dark' ? '#000000' : '#f5f5f7',
+      colorBgContainer: resolvedTheme === 'dark' ? '#1c1c1e' : '#ffffff',
+      colorTextBase: resolvedTheme === 'dark' ? '#f5f5f7' : '#1d1d1f',
+      colorTextSecondary: resolvedTheme === 'dark' ? '#98989d' : '#6e6e73',
+      colorBorderSecondary: resolvedTheme === 'dark' ? '#38383a' : '#e5e5ea',
+      borderRadius: resolvedTheme === 'dark' ? 10 : 6,
+    },
+  }), [resolvedTheme, themeColor]);
 
-  if (loading) return (<div style={containerStyle}><Spin size="large" /></div>);
-  if (error) return (<div style={containerStyle}><Result status="warning" title="无法加载问卷" subTitle={error}
-    extra={<Button icon={<ReloadOutlined />} onClick={() => window.location.reload()}>重试</Button>} /></div>);
+  useEffect(() => {
+    if (!survey) return undefined;
+    const root = document.documentElement;
+    root.style.setProperty('--questra-theme-color', themeColor);
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.href = survey.siteIcon || DEFAULT_SITE_ICON_URL;
+    return () => root.style.removeProperty('--questra-theme-color');
+  }, [survey, themeColor]);
+
+  if (loading) return (<ConfigProvider theme={surveyTheme}><div style={containerStyle}><Spin size="large" /></div></ConfigProvider>);
+  if (error) return (<ConfigProvider theme={surveyTheme}><div style={containerStyle}><Result status="warning" title="无法加载问卷" subTitle={error}
+    extra={<Button icon={<ReloadOutlined />} onClick={() => window.location.reload()}>重试</Button>} /></div></ConfigProvider>);
 
   return (
-    <div style={containerStyle}>
+    <ConfigProvider theme={surveyTheme}><div style={containerStyle}>
+      <Segmented
+        size="small"
+        value={theme}
+        onChange={setTheme}
+        aria-label="问卷页面主题"
+        style={{ position: 'absolute', top: 16, right: 48 }}
+        options={[
+          { value: 'light', icon: <Tooltip title="浅色"><SunOutlined /></Tooltip> },
+          { value: 'dark', icon: <Tooltip title="深色"><MoonOutlined /></Tooltip> },
+          { value: 'system', icon: <Tooltip title="跟随系统"><SettingOutlined /></Tooltip> },
+        ]}
+      />
       <div style={{ maxWidth: 640, width: '100%' }}>
         <Card bordered={false} style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderRadius: 8 }}>
           {!submitted ? (
             <>
-              <Space size={8} style={{ marginBottom: 8 }}>
-                <Avatar shape="square" size={24} src={survey.siteIcon || undefined}>Q</Avatar>
-                <Text type="secondary" style={{ fontSize: 12, letterSpacing: 0.5 }}>
-                  {survey.siteName || 'Questra'} &middot; {survey.kind === 'exam' ? '考试' : '问卷'}
-                </Text>
-              </Space>
-              <Title level={3} style={{ marginTop: 0, marginBottom: 8 }}>{survey.title}</Title>
-              {survey.description && <Paragraph type="secondary" style={{ marginBottom: 16 }}>{survey.description}</Paragraph>}
-              <Space size={16} wrap style={{ marginBottom: 24 }}>
-                <Text type="secondary" style={{ fontSize: 13 }}><FileTextOutlined /> {survey.questions.length} 道题</Text>
-                {survey.kind === 'exam' && <Text type="secondary" style={{ fontSize: 13 }}>满分 {survey.maxScore} 分</Text>}
-                {survey.expiresAt && <Text type="secondary" style={{ fontSize: 13 }}><ClockCircleOutlined /> 截止 {new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false })}</Text>}
-              </Space>
+              <div style={{ textAlign: 'center' }}>
+                <Title level={3} style={{ marginTop: 0, marginBottom: 8 }}>{survey.title}</Title>
+                {survey.description && <Paragraph type="secondary" style={{ marginBottom: 16 }}>{survey.description}</Paragraph>}
+                <Space size={16} wrap style={{ marginBottom: 24, justifyContent: 'center' }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}><FileTextOutlined /> {survey.questions.length} 道题</Text>
+                  {survey.kind === 'exam' && <Text type="secondary" style={{ fontSize: 13 }}>满分 {survey.maxScore} 分</Text>}
+                  {survey.expiresAt && <Text type="secondary" style={{ fontSize: 13 }}><ClockCircleOutlined /> 截止于 {new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false })}</Text>}
+                </Space>
+              </div>
               <Divider style={{ margin: '0 0 24px' }} />
               <SurveyForm survey={survey} onSubmit={handleSubmit} />
             </>
@@ -73,6 +123,6 @@ export default function Survey() {
           <Text type="secondary" style={{ fontSize: 12 }}>Powered by Questra</Text>
         </div>
       </div>
-    </div>
+    </div></ConfigProvider>
   );
 }

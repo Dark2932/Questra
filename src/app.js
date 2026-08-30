@@ -12,7 +12,7 @@ const { securityHeaders } = require('./middleware/security');
 const { createRateLimit } = require('./middleware/rate-limit');
 const { createAdminAccount, getAdminAccount, serializeAccount, verifyPassword } = require('./admin-account');
 const { createSession, deleteSession } = require('./admin-session');
-const { getSiteSettings, updateSiteSettings } = require('./settings');
+const { DEFAULT_SITE_ICON_URL, getSiteSettings, updateSiteSettings } = require('./settings');
 
 function setSessionCookie(res, token, secure = false) {
   const secureFlag = secure ? '; Secure' : '';
@@ -24,6 +24,10 @@ function createApp({ db, config, adminToken }) {
   const siteSettings = getSiteSettings(db, config.siteName || 'Questra');
   config.siteName = siteSettings.siteName;
   config.siteIcon = siteSettings.siteIcon;
+  config.siteIconAsInitial = siteSettings.siteIconAsInitial;
+  config.siteInitial = siteSettings.siteInitial;
+  config.siteInitialColor = siteSettings.siteInitialColor;
+  config.themeColor = siteSettings.themeColor;
   const surveyService = createSurveyService(db);
   const adminAuth = createAdminAuth(adminToken, db);
   const distPath = path.join(__dirname, '..', 'client', 'dist');
@@ -37,6 +41,12 @@ function createApp({ db, config, adminToken }) {
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.locals.siteName = config.siteName;
+  app.locals.siteIcon = config.siteIcon;
+  app.locals.siteIconAsInitial = config.siteIconAsInitial;
+  app.locals.siteInitial = config.siteInitial;
+  app.locals.siteInitialColor = config.siteInitialColor;
+  app.locals.themeColor = config.themeColor;
+  app.locals.defaultSiteIcon = DEFAULT_SITE_ICON_URL;
   app.use(securityHeaders);
   // 轻量请求日志直接输出到启动 Questra 的终端，便于个人服务器调试。
   if (config.logging !== false) {
@@ -51,15 +61,15 @@ function createApp({ db, config, adminToken }) {
       next();
     });
   }
-  app.use(express.json({ limit: '256kb' }));
-  app.use(express.urlencoded({ extended: false, limit: '256kb' }));
+  app.use(express.json({ limit: '2mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '2mb' }));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
 
-  app.get('/api/config', (req, res) => res.json({ siteName: config.siteName, siteIcon: config.siteIcon || '' }));
+  app.get('/api/config', (req, res) => res.json({ siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor }));
 
   app.get('/api/setup/status', (req, res) => {
     const account = getAdminAccount(db);
-    res.json({ initialized: Boolean(account), siteName: config.siteName, siteIcon: config.siteIcon || '' });
+    res.json({ initialized: Boolean(account), siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor });
   });
 
   app.post('/api/setup', loginLimiter, (req, res) => {
@@ -71,7 +81,16 @@ function createApp({ db, config, adminToken }) {
     })();
     config.siteName = created.settings.siteName;
     config.siteIcon = created.settings.siteIcon;
+    config.siteIconAsInitial = created.settings.siteIconAsInitial;
+    config.siteInitial = created.settings.siteInitial;
+    config.siteInitialColor = created.settings.siteInitialColor;
+    config.themeColor = created.settings.themeColor;
     app.locals.siteName = config.siteName;
+    app.locals.siteIcon = config.siteIcon;
+    app.locals.siteIconAsInitial = config.siteIconAsInitial;
+    app.locals.siteInitial = config.siteInitial;
+    app.locals.siteInitialColor = config.siteInitialColor;
+    app.locals.themeColor = config.themeColor;
     const session = createSession(db, created.account.id);
     setSessionCookie(res, session.token, req.secure);
     res.status(201).json({ user: created.account, site: created.settings });
@@ -140,7 +159,7 @@ function createApp({ db, config, adminToken }) {
     app.get('/s/:id', (req, res) => {
       const survey = surveyService.getSurvey(req.params.id);
       surveyService.ensureSurveyOpen(survey);
-      res.render('survey', { survey, siteName: config.siteName });
+      res.render('survey', { survey, siteName: config.siteName, siteIcon: config.siteIcon, siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor });
     });
     app.use('/admin', adminAuth, createAdminPages({ db, config, surveyService }));
   }

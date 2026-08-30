@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export function useTheme() {
-  const [theme, setThemeState] = useState(() => localStorage.getItem('questra-theme') || 'system');
+export function useTheme(storageKey = 'questra-theme', applyToDocument = true) {
+  const [theme, setThemeState] = useState(() => localStorage.getItem(storageKey) || 'system');
   const [systemDark, setSystemDark] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
   );
@@ -15,14 +15,15 @@ export function useTheme() {
   }, [theme]);
 
   useEffect(() => {
+    if (!applyToDocument) return;
     const isDark = theme === 'dark' || (theme === 'system' && systemDark);
     document.documentElement.classList.toggle('dark', isDark);
-  }, [theme, systemDark]);
+  }, [applyToDocument, theme, systemDark]);
 
   const setTheme = useCallback((t) => {
     setThemeState(t);
-    localStorage.setItem('questra-theme', t);
-  }, []);
+    localStorage.setItem(storageKey, t);
+  }, [storageKey]);
 
   const resolvedTheme = theme === 'dark' || (theme === 'system' && systemDark) ? 'dark' : 'light';
 

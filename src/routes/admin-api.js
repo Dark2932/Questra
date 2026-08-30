@@ -43,7 +43,16 @@ function createAdminApi({ db, surveyService, config, app }) {
     const site = updateSiteSettings(db, req.body);
     config.siteName = site.siteName;
     config.siteIcon = site.siteIcon;
+    config.siteIconAsInitial = site.siteIconAsInitial;
+    config.siteInitial = site.siteInitial;
+    config.siteInitialColor = site.siteInitialColor;
+    config.themeColor = site.themeColor;
     app.locals.siteName = site.siteName;
+    app.locals.siteIcon = site.siteIcon;
+    app.locals.siteIconAsInitial = site.siteIconAsInitial;
+    app.locals.siteInitial = site.siteInitial;
+    app.locals.siteInitialColor = site.siteInitialColor;
+    app.locals.themeColor = site.themeColor;
     res.json({ site });
   });
 

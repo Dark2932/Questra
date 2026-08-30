@@ -26,14 +26,14 @@ function createAdminPages({ db, config, surveyService }) {
       LEFT JOIN responses ON date(responses.submitted_at) = days.day
       GROUP BY days.day ORDER BY days.day
     `).all();
-    res.render('admin/dashboard', { siteName: config.siteName, totals, recentSurveys, trend });
+    res.render('admin/dashboard', { siteName: config.siteName, siteIcon: config.siteIcon, siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor, totals, recentSurveys, trend });
   });
 
-  router.get('/questions', (req, res) => res.render('admin/questions', { siteName: config.siteName }));
-  router.get('/surveys', (req, res) => res.render('admin/surveys', { siteName: config.siteName }));
+  router.get('/questions', (req, res) => res.render('admin/questions', { siteName: config.siteName, siteIcon: config.siteIcon, siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor }));
+  router.get('/surveys', (req, res) => res.render('admin/surveys', { siteName: config.siteName, siteIcon: config.siteIcon, siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor }));
   router.get('/surveys/:id/responses', (req, res) => {
     const survey = surveyService.getSurvey(req.params.id);
-    res.render('admin/responses', { siteName: config.siteName, survey });
+    res.render('admin/responses', { siteName: config.siteName, siteIcon: config.siteIcon, siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor, survey });
   });
 
   return router;
