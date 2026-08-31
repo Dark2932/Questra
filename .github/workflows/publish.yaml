@@ -1,4 +1,4 @@
-name: Publish Questra package
+name: Build and publish Questra release
 
 on:
   release:
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   publish:
-    name: 校验、打包并发布 npm
+    name: 构建并上传 Release 安装包
     # CI 创建的 bot Release 由 ci.yml 显式调度；人工发布的 Release 由 release.published 触发。
     # 两种入口在这里汇合，避免 CI Release 同时触发事件和手动调度造成重复发布。
     if: ${{ github.event_name != 'release' || github.event.release.author.login != 'github-actions[bot]' }}
@@ -31,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # 人工 Release 使用其标签所指向的源码，页面无需预先上传任何附件。
           ref: ${{ inputs.tag || github.event.release.tag_name }}
       - uses: pnpm/action-setup@v4
         with:
@@ -40,10 +41,9 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - name: 安装支持 OIDC 的 npm CLI
-        run: npm install --global npm@11.6.2
       - run: pnpm install --frozen-lockfile
       - name: 校验 Release、标签与包版本
+        id: release
         shell: bash
         run: |
           set -euo pipefail
@@ -62,29 +62,45 @@ jobs:
             echo "Release $RELEASE_TAG 仍是草稿，不能发布"
             exit 1
           fi
+          echo "prerelease=${IS_PRERELEASE}" >> "$GITHUB_OUTPUT"
           if [[ "$IS_PRERELEASE" = true ]]; then
-            echo "Release $RELEASE_TAG 是预发布版本，当前工作流不发布预发布包"
-            exit 1
+            echo "Release $RELEASE_TAG 是预发布版本：将自动上传 .tgz，但不会发布到 npm 正式渠道"
+          else
+            echo "正式 Release $RELEASE_TAG 已确认，将自动上传 .tgz 并发布到 npm"
           fi
-          echo "Release $RELEASE_TAG 已确认，将使用统一发布流程"
         env:
           GH_TOKEN: ${{ github.token }}
-      - name: 检查发布内容
-        run: pnpm run release:check
-      - name: 生成 npm 包
+      - name: 检查 Release 对应源码
+        run: pnpm run check
+      - name: 构建 Release 对应源码
+        run: pnpm run build
+      - name: 生成并校验 Release 安装包
         id: pack
         shell: bash
         run: |
           set -euo pipefail
           PACKAGE_FILE="$(npm pack --ignore-scripts --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s)[0].filename))")"
-          test -f "$PACKAGE_FILE"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          EXPECTED_FILE="questra-${PACKAGE_VERSION}.tgz"
+          test "$PACKAGE_FILE" = "$EXPECTED_FILE" || {
+            echo "生成的安装包文件名异常：${PACKAGE_FILE}，预期为 ${EXPECTED_FILE}"
+            exit 1
+          }
+          test -s "$PACKAGE_FILE" || {
+            echo "未生成有效的 Release 安装包：${PACKAGE_FILE}"
+            exit 1
+          }
           echo "file=${PACKAGE_FILE}" >> "$GITHUB_OUTPUT"
-      - name: 将同一包文件上传到 Release
+      - name: 自动上传 .tgz 到当前 Release
         env:
           GH_TOKEN: ${{ github.token }}
           PACKAGE_FILE: ${{ steps.pack.outputs.file }}
         run: gh release upload "$RELEASE_TAG" "$PACKAGE_FILE" --clobber
+      - name: 安装支持 OIDC 的 npm CLI
+        if: ${{ steps.release.outputs.prerelease != 'true' }}
+        run: npm install --global npm@11.6.2
       - name: 使用 OIDC 发布同一个包文件到 npm
+        if: ${{ steps.release.outputs.prerelease != 'true' }}
         env:
           PACKAGE_FILE: ${{ steps.pack.outputs.file }}
         run: npm publish "$PACKAGE_FILE" --access public --provenance --ignore-scripts

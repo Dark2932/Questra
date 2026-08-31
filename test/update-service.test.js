@@ -145,6 +145,7 @@ test('npm 安装失败时保留可诊断输出', async () => {
 test('源码构建版不访问 GitHub 且禁用更新操作', async () => {
   let fetched = false;
   const service = createUpdateService({
+    currentVersion: '0.3.4',
     installationType: 'source',
     fetchImpl: async () => { fetched = true; return response([]); },
     installPackage: async () => assert.fail('源码构建版不应执行 npm 安装')

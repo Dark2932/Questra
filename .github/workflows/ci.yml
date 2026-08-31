@@ -141,11 +141,11 @@ jobs:
             --title "Questra ${VERSION}" \
             --generate-notes
 
-      - name: 触发统一 npm 发布工作流
+      - name: 触发统一 Release 打包与 npm 发布工作流
         if: ${{ steps.version.outputs.create_release == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         shell: bash
-        # CI 创建的 Release 使用 workflow_dispatch；publish.yaml 会跳过同一 bot 产生的 release 事件，避免重复发布。
+        # CI 创建的 Release 使用 workflow_dispatch；人工 Release 则由 release.published 自动触发同一流程。
         run: gh workflow run publish.yaml --ref main --field tag="$VERSION"

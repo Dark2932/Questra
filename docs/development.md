@@ -100,4 +100,4 @@ npm 可分别使用对应的 `npm run` 命令。`check` 覆盖仓库边界、后
 
 版本发布由 GitHub Actions 根据 `package.json` 版本创建标签：版本未手动修改时自动递增 patch，手动修改时直接使用新版本且不再递增；如果本地或远程已经存在同名标签，本次发布会在打标签前终止。major/minor 版本会创建 Release，patch 版本只创建标签，除非维护者随后在 GitHub 发布对应 Release。
 
-CI 创建的 Release 使用 `workflow_dispatch` 调用发布工作流；维护者在 GitHub 手动发布匹配版本的非草稿、非预发布 Release 时，`release.published` 会进入同一个校验、打包、上传附件和 npm Trusted Publishing 流程。正式发布前不要在本地执行真实 `npm publish`，也不要把 Registry 凭据写入仓库。
+CI 创建的 Release 使用 `workflow_dispatch` 调用发布工作流；维护者在 GitHub 手动发布 Release 时，只需选择指向目标源码的版本标签并填写标题、说明等版本信息，无需手动上传安装包。`release.published` 会检出该标签对应的源码，完成检查和前端构建，生成 `questra-<版本>.tgz` 并上传到当前 Release。正式 Release 随后使用同一个文件执行 npm Trusted Publishing；预发布 Release 只上传 `.tgz`，不会进入 npm 正式渠道。Release 标签必须与该源码中的 `package.json` 版本一致。正式发布前不要在本地执行真实 `npm publish`，也不要把 Registry 凭据写入仓库。
