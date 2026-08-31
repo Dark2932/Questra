@@ -44,10 +44,11 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
   const setColor = (form, field) => (color, css) => form.setFieldValue(field, css || color?.toCssString?.() || '#0D9488');
 
   useEffect(() => {
-    api.getSettings().then((settings) => {
+    Promise.all([api.getSettings(), api.getUpdateStatus()]).then(([settings, updateStatus]) => {
       setData(settings);
       personalizationForm.setFieldsValue(settings.site);
       accountForm.setFieldsValue(settings.account);
+      setUpdateInfo(updateStatus);
     }).catch((e) => message.error(e.message));
   }, [accountForm, message, personalizationForm]);
 
@@ -125,8 +126,9 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
     try {
       const result = await api.checkForUpdate();
       setUpdateInfo(result);
-      if (result.updateAvailable) message.success(`发现新版本 ${result.latestVersion}`);
-      else if (result.previewVersion) message.warning('当前正在运行开发预览版');
+      if (result.sourceBuild) message.info('当前为源码构建版，无法使用在线更新');
+      else if (result.invalidVersion) message.warning('当前版本不属于已发布的正式版本');
+      else if (result.updateAvailable) message.success(`发现新版本 ${result.latestVersion}`);
       else message.success('当前已经是最新版本');
     } catch (error) {
       message.error(error.message);
@@ -160,6 +162,8 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
   };
 
   if (!data) return <Card loading />;
+
+  const updateBlocked = Boolean(updateInfo && !updateInfo.updateSupported);
 
   const items = [
     { key: 'site', label: <Space><SettingOutlined />站点设置</Space>, children: <div style={{ maxWidth: 720 }}>
@@ -201,18 +205,20 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
       <Title level={4}>更新</Title><Paragraph type="secondary">从 GitHub Releases 检测正式版本，并使用 npm 安装更新。</Paragraph>
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <Space wrap>
-          <Button type="primary" icon={<ReloadOutlined />} loading={updateChecking} disabled={updateInstalling} onClick={checkForUpdate}>检测更新</Button>
-          <Button icon={<CloudDownloadOutlined />} loading={updateInstalling} disabled={!updateInfo?.updateAvailable || updateChecking} onClick={confirmInstallUpdate}>安装新版本</Button>
+          <Button type="primary" icon={<ReloadOutlined />} loading={updateChecking} disabled={updateInstalling || updateBlocked || !updateInfo} onClick={checkForUpdate}>检测更新</Button>
+          <Button icon={<CloudDownloadOutlined />} loading={updateInstalling} disabled={!updateInfo?.updateAvailable || !updateInfo?.updateSupported || updateChecking} onClick={confirmInstallUpdate}>安装新版本</Button>
         </Space>
-        {!updateInfo && <Alert type="info" showIcon message="尚未检测更新" description="检测过程会访问 Questra 的 GitHub Releases，不会自动安装任何内容。" />}
-        {updateInfo && <Alert
-          type={updateInfo.updateAvailable || updateInfo.previewVersion ? 'warning' : 'success'}
+        {updateInfo?.sourceBuild && <Alert type="info" showIcon message="当前版本为源码构建版" description={<Space direction="vertical" size={4}><Text>源码构建版无法使用检测更新和安装新版本功能。</Text><Typography.Link href={updateInfo.sourceRepositoryUrl} target="_blank" rel="noreferrer">前往 Questra 源码仓库查看变更</Typography.Link></Space>} />}
+        {updateInfo && !updateInfo.sourceBuild && !updateInfo.checked && <Alert type="info" showIcon message="尚未检测更新" description="点击“检测更新”后，系统会对新旧版本分别进行检测于验证。" />}
+        {updateInfo?.invalidVersion && <Alert type="warning" showIcon message={`当前版本 ${updateInfo.currentVersion} 不属于已发布的正式版本`} description={<Space direction="vertical" size={4}><Text>该版本号不存在于已发布的 GitHub Release 中，无法进行更新。</Text><Text>请重新安装最新正式版 {updateInfo.latestVersion}：</Text><Text code>npm i -g questra@{updateInfo.latestVersion}</Text><Typography.Link href={updateInfo.releaseUrl} target="_blank" rel="noreferrer">查看 GitHub Releases</Typography.Link></Space>} />}
+        {updateInfo?.checked && updateInfo.compliantVersion && <Alert
+          type={updateInfo.updateAvailable ? 'warning' : 'success'}
           showIcon
-          message={updateInfo.updateAvailable ? `发现新版本 ${updateInfo.latestVersion}` : updateInfo.previewVersion ? `开发预览版 ${updateInfo.currentVersion}` : `当前已是最新版本 ${updateInfo.currentVersion}`}
+          message={updateInfo.updateAvailable ? `发现新版本 ${updateInfo.latestVersion}` : `当前已是最新正式版 ${updateInfo.currentVersion}`}
           description={<Space direction="vertical" size={4}>
             <Text>当前版本：{updateInfo.currentVersion}；最新正式版本：{updateInfo.latestVersion}</Text>
-            {updateInfo.previewVersion && <Text>当前版本高于最新正式版本，可能包含尚未发布的功能。</Text>}
-            <Typography.Link href="https://github.com/Dark2932/Questra/releases" target="_blank" rel="noreferrer">查看 GitHub Releases</Typography.Link>
+            <Text>您已落后 {updateInfo.versionsBehind} 个正式版本。</Text>
+            <Typography.Link href={updateInfo.releaseUrl} target="_blank" rel="noreferrer">查看 GitHub Releases</Typography.Link>
             {updateInfo.publishedAt && <Text type="secondary">最新正式版发布时间：{new Date(updateInfo.publishedAt).toLocaleString('zh-CN', { hour12: false })}</Text>}
           </Space>}
         />}

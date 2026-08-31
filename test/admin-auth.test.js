@@ -20,6 +20,7 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
     publishedAt: null, releaseNotes: '测试版本'
   };
   const updateService = {
+    getUpdateStatus: () => ({ currentVersion: '0.3.3', installationType: 'global', sourceBuild: false, updateSupported: true, checked: false }),
     checkForUpdate: async () => { updateCalls.push('check'); return updateInfo; },
     installLatest: async () => { updateCalls.push('install'); return { ...updateInfo, installedVersion: '0.4.0', restartRequired: true, output: 'ok' }; }
   };
@@ -58,6 +59,8 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
   assert.equal(unauthorizedUpdate.status, 401);
   const update = await fetch(`${baseUrl}/api/admin/update`, { headers: { cookie: setupCookie } });
   assert.deepEqual(await json(update), updateInfo);
+  const updateStatus = await fetch(`${baseUrl}/api/admin/update/status`, { headers: { cookie: setupCookie } });
+  assert.equal((await json(updateStatus)).installationType, 'global');
   const install = await fetch(`${baseUrl}/api/admin/update/install`, { method: 'POST', headers: { cookie: setupCookie } });
   assert.equal((await json(install)).restartRequired, true);
   assert.deepEqual(updateCalls, ['check', 'install']);

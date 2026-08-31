@@ -57,6 +57,7 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `GET` | `/api/admin/settings` | 站点和管理员资料 |
 | `PUT` | `/api/admin/settings/site` | 修改站点名称和图标 |
 | `PUT` | `/api/admin/settings/account` | 修改唯一管理员昵称、账号或密码 |
+| `GET` | `/api/admin/update/status` | 查询当前版本的安装来源和更新能力 |
 | `GET` | `/api/admin/update` | 从 GitHub Releases 检测最新正式版本 |
 | `POST` | `/api/admin/update/install` | 使用 npm 全局安装服务端校验后的最新版本 |
 | `GET` | `/api/admin/questions` | 查询题库，包含标准答案 |
@@ -75,7 +76,9 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `GET` | `/api/admin/surveys/:id/responses` | 查看答卷与逐题判分 |
 | `GET` | `/api/admin/surveys/:id/export` | 导出 CSV 或 JSON |
 
-更新检测返回当前版本、最新正式版本、`updateAvailable`、`previewVersion`、Releases 总入口、发布时间和更新说明。当前版本高于最新正式版本时，`previewVersion` 为 `true`。安装接口不接受包名或版本参数，会重新读取 GitHub 最新正式 Release，只执行固定包名的全局 npm 安装；成功响应包含 `installedVersion`、`restartRequired: true` 和截断后的 npm 输出。安装成功不会自动重启当前进程。
+更新状态接口返回 `installationType`（`source` 或 `global`）、`sourceBuild` 和 `updateSupported`，用于在联网前识别源码构建版。源码构建版不会访问 GitHub，检测和安装操作均被禁用，并提供源码仓库入口。
+
+更新检测会读取 GitHub Releases 中所有已发布且非草稿、非预发布的正式版本。只有当前版本号确实存在于该列表时才算合规；合规版本返回最新正式版本、`versionsBehind`（落后版本数量）、`updateAvailable`、Releases 总入口、发布时间和更新说明。不在列表中的版本返回 `invalidVersion: true`，检测和安装均不可用，页面会提示重新安装最新正式版。安装接口不接受包名或版本参数，会重新读取并校验 Release，只执行固定包名的全局 npm 安装；成功响应包含 `installedVersion`、`restartRequired: true` 和截断后的 npm 输出。安装成功不会自动重启当前进程。
 
 更新接口需要管理认证。安装操作还要求服务器能够访问 GitHub 与 npm，并拥有 npm 全局目录写权限；重复安装任务返回 `409`，外部服务或 npm 失败会返回可读错误。源码目录不会被此接口修改。
 

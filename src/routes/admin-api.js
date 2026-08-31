@@ -68,6 +68,12 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
     res.json(await updateService.checkForUpdate());
   }));
 
+  router.get('/update/status', (req, res) => {
+    res.json(typeof updateService.getUpdateStatus === 'function'
+      ? updateService.getUpdateStatus()
+      : { currentVersion: null, installationType: 'global', sourceBuild: false, updateSupported: true, checked: false });
+  });
+
   router.post('/update/install', asyncRoute(async (req, res) => {
     res.json(await updateService.installLatest());
   }));

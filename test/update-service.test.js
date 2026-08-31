@@ -42,10 +42,11 @@ test('版本解析和比较只接受稳定的三段版本号', () => {
 test('检测更新解析 GitHub 最新正式 Release', async () => {
   let request;
   const service = createUpdateService({
+    installationType: 'global',
     currentVersion: '0.3.3',
     fetchImpl: async (url, options) => {
       request = { url, options };
-      return response(release());
+      return response([release({ tag_name: 'v0.3.3' }), release()]);
     }
   });
 
@@ -55,36 +56,40 @@ test('检测更新解析 GitHub 最新正式 Release', async () => {
   assert.equal(result.currentVersion, '0.3.3');
   assert.equal(result.latestVersion, '0.4.0');
   assert.equal(result.updateAvailable, true);
+  assert.equal(result.compliantVersion, true);
+  assert.equal(result.versionsBehind, 1);
   assert.equal(result.previewVersion, false);
   assert.equal(result.releaseUrl, 'https://github.com/Dark2932/Questra/releases');
   assert.equal(result.releaseNotes, '更新说明');
 });
 
-test('当前版本高于 Release 时标记为开发预览版且不提供安装', async () => {
+test('当前版本不在正式 Release 列表时标记为不合规且不提供安装', async () => {
   const service = createUpdateService({
+    installationType: 'global',
     currentVersion: '0.4.1',
-    fetchImpl: async () => response(release()),
+    fetchImpl: async () => response([release()]),
     installPackage: async () => assert.fail('不应执行 npm 安装')
   });
 
   const result = await service.checkForUpdate();
   assert.equal(result.updateAvailable, false);
-  assert.equal(result.previewVersion, true);
+  assert.equal(result.previewVersion, false);
+  assert.equal(result.invalidVersion, true);
   assert.equal(result.releaseUrl, 'https://github.com/Dark2932/Questra/releases');
-  await assert.rejects(service.installLatest(), (error) => error.status === 409 && /最新版本/.test(error.message));
+  await assert.rejects(service.installLatest(), (error) => error.status === 409 && /正式版本/.test(error.message));
 });
 
 test('检测更新会明确报告 GitHub 请求和数据错误', async (t) => {
   await t.test('非成功状态', async () => {
-    const service = createUpdateService({ fetchImpl: async () => response({}, { ok: false, status: 403 }) });
+    const service = createUpdateService({ installationType: 'global', fetchImpl: async () => response({}, { ok: false, status: 403 }) });
     await assert.rejects(service.checkForUpdate(), /访问频率限制/);
   });
   await t.test('无效 JSON', async () => {
-    const service = createUpdateService({ fetchImpl: async () => response(null, { json: async () => { throw new Error('invalid'); } }) });
+    const service = createUpdateService({ installationType: 'global', fetchImpl: async () => response(null, { json: async () => { throw new Error('invalid'); } }) });
     await assert.rejects(service.checkForUpdate(), /无法解析/);
   });
   await t.test('无效标签', async () => {
-    const service = createUpdateService({ fetchImpl: async () => response(release({ tag_name: 'latest' })) });
+    const service = createUpdateService({ installationType: 'global', fetchImpl: async () => response(release({ tag_name: 'latest' })) });
     await assert.rejects(service.checkForUpdate(), /版本标签无效/);
   });
 });
@@ -110,8 +115,9 @@ test('npm 安装器使用固定包名、校验版本和无 shell 参数', async 
 test('安装最新版会重新检测 Release 并返回重启提示', async () => {
   const installed = [];
   const service = createUpdateService({
+    installationType: 'global',
     currentVersion: '0.3.3',
-    fetchImpl: async () => response(release()),
+    fetchImpl: async () => response([release({ tag_name: 'v0.3.3' }), release()]),
     installPackage: async (version) => {
       installed.push(version);
       return '安装成功';
@@ -134,4 +140,30 @@ test('npm 安装失败时保留可诊断输出', async () => {
   });
 
   await assert.rejects(installer('0.4.0'), /EACCES: permission denied/);
+});
+
+test('源码构建版不访问 GitHub 且禁用更新操作', async () => {
+  let fetched = false;
+  const service = createUpdateService({
+    installationType: 'source',
+    fetchImpl: async () => { fetched = true; return response([]); },
+    installPackage: async () => assert.fail('源码构建版不应执行 npm 安装')
+  });
+
+  assert.deepEqual(service.getUpdateStatus(), {
+    currentVersion: '0.3.4',
+    installationType: 'source',
+    sourceBuild: true,
+    updateSupported: false,
+    checked: false,
+    compliantVersion: null,
+    updateAvailable: false,
+    releaseUrl: 'https://github.com/Dark2932/Questra/releases',
+    sourceRepositoryUrl: 'https://github.com/Dark2932/Questra'
+  });
+  const result = await service.checkForUpdate();
+  assert.equal(result.checked, true);
+  assert.equal(result.sourceBuild, true);
+  assert.equal(fetched, false);
+  await assert.rejects(service.installLatest(), (error) => error.status === 409 && /源码构建版/.test(error.message));
 });

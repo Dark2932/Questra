@@ -1,12 +1,15 @@
 'use strict';
 
 const { execFile } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 const packageJson = require('../package.json');
 const { HttpError } = require('./lib/http');
 
-const LATEST_RELEASE_URL = 'https://api.github.com/repos/Dark2932/Questra/releases/latest';
+const RELEASES_URL = 'https://api.github.com/repos/Dark2932/Questra/releases';
+const LATEST_RELEASE_URL = `${RELEASES_URL}?per_page=100&page=1`;
 const RELEASE_PAGE_URL = 'https://github.com/Dark2932/Questra/releases';
+const SOURCE_REPOSITORY_URL = 'https://github.com/Dark2932/Questra';
 const VERSION_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)$/;
 
 function exposedError(status, message) {
@@ -31,6 +34,16 @@ function compareVersions(left, right) {
     if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
   }
   return 0;
+}
+
+/**
+ * 发布包不会包含这些源码开发文件；通过源码运行时至少会存在其中一项。
+ * 这让更新页无需联网即可先禁用不适用于源码构建的操作。
+ */
+function detectInstallationType(installationDirectory = path.resolve(__dirname, '..')) {
+  const root = path.resolve(installationDirectory);
+  const sourceMarkers = ['.git', 'pnpm-lock.yaml', 'client/src', 'scripts'];
+  return sourceMarkers.some((marker) => fs.existsSync(path.join(root, marker))) ? 'source' : 'global';
 }
 
 function createNpmInstaller({
@@ -67,62 +80,111 @@ function createNpmInstaller({
 function createUpdateService({
   fetchImpl = globalThis.fetch,
   installPackage = createNpmInstaller(),
-  currentVersion = packageJson.version
+  currentVersion = packageJson.version,
+  installationType = detectInstallationType()
 } = {}) {
   const normalizedCurrentVersion = parseVersion(currentVersion).version;
   let installing = false;
 
+  function getUpdateStatus() {
+    const sourceBuild = installationType === 'source';
+    return {
+      currentVersion: normalizedCurrentVersion,
+      installationType,
+      sourceBuild,
+      updateSupported: !sourceBuild,
+      checked: false,
+      compliantVersion: null,
+      updateAvailable: false,
+      releaseUrl: RELEASE_PAGE_URL,
+      sourceRepositoryUrl: SOURCE_REPOSITORY_URL
+    };
+  }
+
   async function checkForUpdate() {
+    const status = getUpdateStatus();
+    if (!status.updateSupported) return { ...status, checked: true };
+
+    const releases = [];
     let response;
-    try {
-      response = await fetchImpl(LATEST_RELEASE_URL, {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': `Questra/${normalizedCurrentVersion}`,
-          'X-GitHub-Api-Version': '2022-11-28'
-        },
-        signal: globalThis.AbortSignal.timeout(10_000)
-      });
-    } catch (error) {
-      throw exposedError(502, `无法连接 GitHub Releases：${error.message}`);
+    for (let page = 1; page <= 10; page += 1) {
+      try {
+        response = await fetchImpl(`${RELEASES_URL}?per_page=100&page=${page}`, {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            'User-Agent': `Questra/${normalizedCurrentVersion}`,
+            'X-GitHub-Api-Version': '2022-11-28'
+          },
+          signal: globalThis.AbortSignal.timeout(10_000)
+        });
+      } catch (error) {
+        throw exposedError(502, `无法连接 GitHub Releases：${error.message}`);
+      }
+
+      if (!response.ok) {
+        const rateLimit = response.status === 403 ? '，可能已达到 GitHub API 访问频率限制' : '';
+        throw exposedError(502, `GitHub Releases 请求失败 (${response.status})${rateLimit}`);
+      }
+
+      let pageReleases;
+      try {
+        pageReleases = await response.json();
+      } catch {
+        throw exposedError(502, 'GitHub Releases 返回了无法解析的数据');
+      }
+      if (!Array.isArray(pageReleases)) pageReleases = pageReleases ? [pageReleases] : [];
+      releases.push(...pageReleases);
+      if (pageReleases.length < 100) break;
     }
 
-    if (!response.ok) {
-      const rateLimit = response.status === 403 ? '，可能已达到 GitHub API 访问频率限制' : '';
-      throw exposedError(502, `GitHub Releases 请求失败 (${response.status})${rateLimit}`);
+    const officialReleases = releases.map((release) => {
+      if (!release || release.draft || release.prerelease) return null;
+      try {
+        return { release, ...parseVersion(release.tag_name) };
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
+    if (!officialReleases.length) {
+      throw exposedError(502, 'GitHub Releases 未返回有效的正式版本标签（版本标签无效）');
     }
 
-    let release;
-    try {
-      release = await response.json();
-    } catch {
-      throw exposedError(502, 'GitHub Releases 返回了无法解析的数据');
-    }
-
-    if (!release || release.draft || release.prerelease) {
-      throw exposedError(502, 'GitHub Releases 未返回可安装的正式版本');
-    }
-
-    const latestVersion = parseVersion(release.tag_name).version;
-    const comparison = compareVersions(latestVersion, normalizedCurrentVersion);
+    const versions = [...new Map(officialReleases.map((item) => [item.version, item])).values()]
+      .sort((left, right) => compareVersions(right.version, left.version));
+    const latest = versions[0];
+    const currentRelease = versions.find((item) => item.version === normalizedCurrentVersion);
+    const comparison = compareVersions(latest.version, normalizedCurrentVersion);
+    const compliantVersion = Boolean(currentRelease);
+    const updateAvailable = compliantVersion && comparison > 0;
 
     return {
       currentVersion: normalizedCurrentVersion,
-      latestVersion,
-      updateAvailable: comparison > 0,
-      previewVersion: comparison < 0,
-      releaseName: String(release.name || release.tag_name || `v${latestVersion}`),
+      installationType,
+      sourceBuild: false,
+      updateSupported: compliantVersion,
+      checked: true,
+      compliantVersion,
+      invalidVersion: !compliantVersion,
+      latestVersion: latest.version,
+      updateAvailable,
+      versionsBehind: compliantVersion ? versions.filter((item) => compareVersions(item.version, normalizedCurrentVersion) > 0).length : null,
+      previewVersion: false,
+      releaseName: String(latest.release.name || latest.release.tag_name || `v${latest.version}`),
       releaseUrl: RELEASE_PAGE_URL,
-      publishedAt: release.published_at || null,
-      releaseNotes: String(release.body || '').slice(0, 20_000)
+      sourceRepositoryUrl: SOURCE_REPOSITORY_URL,
+      publishedAt: latest.release.published_at || null,
+      releaseNotes: String(latest.release.body || '').slice(0, 20_000)
     };
   }
 
   async function installLatest() {
+    const status = getUpdateStatus();
+    if (!status.updateSupported) throw exposedError(409, status.sourceBuild ? '源码构建版不支持在线更新，请前往 Questra 源码仓库获取最新版代码' : '当前版本不属于 GitHub Releases 正式版本，请重新安装最新正式版');
     if (installing) throw exposedError(409, '已有更新安装任务正在进行');
     installing = true;
     try {
       const release = await checkForUpdate();
+      if (!release.compliantVersion) throw exposedError(409, '当前版本不属于 GitHub Releases 正式版本，请重新安装最新正式版');
       if (!release.updateAvailable) throw exposedError(409, '当前已经是最新版本，无需安装');
       const output = await installPackage(release.latestVersion);
       return {
@@ -136,13 +198,15 @@ function createUpdateService({
     }
   }
 
-  return { checkForUpdate, installLatest };
+  return { checkForUpdate, getUpdateStatus, installLatest };
 }
 
 module.exports = {
   LATEST_RELEASE_URL,
+  RELEASES_URL,
   compareVersions,
   createNpmInstaller,
   createUpdateService,
+  detectInstallationType,
   parseVersion
 };
