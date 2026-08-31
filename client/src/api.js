@@ -27,6 +27,8 @@ export const api = {
   getSettings: () => request('/admin/settings'),
   updateSiteSettings: (data) => request('/admin/settings/site', { method: 'PUT', body: JSON.stringify(data) }),
   updateAccountSettings: (data) => request('/admin/settings/account', { method: 'PUT', body: JSON.stringify(data) }),
+  checkForUpdate: () => request('/admin/update'),
+  installUpdate: () => request('/admin/update/install', { method: 'POST' }),
 
   getQuestions: () => request('/admin/questions'),
   createQuestion: (data) => request('/admin/questions', { method: 'POST', body: JSON.stringify(data) }),

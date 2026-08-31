@@ -57,6 +57,8 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `GET` | `/api/admin/settings` | 站点和管理员资料 |
 | `PUT` | `/api/admin/settings/site` | 修改站点名称和图标 |
 | `PUT` | `/api/admin/settings/account` | 修改唯一管理员昵称、账号或密码 |
+| `GET` | `/api/admin/update` | 从 GitHub Releases 检测最新正式版本 |
+| `POST` | `/api/admin/update/install` | 使用 npm 全局安装服务端校验后的最新版本 |
 | `GET` | `/api/admin/questions` | 查询题库，包含标准答案 |
 | `POST` | `/api/admin/questions` | 创建题目 |
 | `PUT` | `/api/admin/questions/:id` | 更新题目 |
@@ -68,10 +70,14 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `GET` | `/api/admin/surveys` | 查询问卷和考试列表 |
 | `POST` | `/api/admin/surveys` | 从题库生成问卷或考试 |
 | `GET` | `/api/admin/surveys/:id` | 查看实例和题目快照 |
-| `PUT` | `/api/admin/surveys/:id` | 修改基本信息或无答卷实例结构 |
+| `PUT` | `/api/admin/surveys/:id` | 修改实例类型、基本信息、题目和计分结构 |
 | `DELETE` | `/api/admin/surveys/:id` | 删除实例及其答卷 |
 | `GET` | `/api/admin/surveys/:id/responses` | 查看答卷与逐题判分 |
 | `GET` | `/api/admin/surveys/:id/export` | 导出 CSV 或 JSON |
+
+更新检测返回当前版本、最新正式版本、`updateAvailable`、`previewVersion`、Releases 总入口、发布时间和更新说明。当前版本高于最新正式版本时，`previewVersion` 为 `true`。安装接口不接受包名或版本参数，会重新读取 GitHub 最新正式 Release，只执行固定包名的全局 npm 安装；成功响应包含 `installedVersion`、`restartRequired: true` 和截断后的 npm 输出。安装成功不会自动重启当前进程。
+
+更新接口需要管理认证。安装操作还要求服务器能够访问 GitHub 与 npm，并拥有 npm 全局目录写权限；重复安装任务返回 `409`，外部服务或 npm 失败会返回可读错误。源码目录不会被此接口修改。
 
 ## 题目和实例格式
 
@@ -119,6 +125,8 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 ```
 
 考试中的每道题必须已有标准答案。`scoringMode` 为 `weighted` 时权重总和必须为 100；为 `per_question` 时传入 `questionScores` 对象。实例生成后题目和计分配置会保存为快照。
+
+编辑实例可提交与创建时相同的结构字段，并可额外提交 `status`。即使实例已有答卷，也可以更换题目、选题方式、实例类型和计分配置；新结构用于后续提交，已有答卷引用的旧题目快照和提交时分数继续保留。答卷接口中的历史题目带有 `archived: true`。当 `expiresAt` 不为空且已到期时，服务端始终将 `status` 保存为 `closed`；只有同一次请求把截止时间改到未来，`status: active` 才会生效。
 
 ## 答卷和导出
 

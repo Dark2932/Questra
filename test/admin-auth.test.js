@@ -13,7 +13,17 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-admin-'));
   const db = openDatabase(path.join(tempDir, 'test.db'));
   migrate(db);
-  const app = createApp({ db, adminToken: 'legacy-token', config: { siteName: 'Questra', hooks: {} } });
+  const updateCalls = [];
+  const updateInfo = {
+    currentVersion: '0.3.3', latestVersion: '0.4.0', updateAvailable: true, previewVersion: false,
+    releaseName: 'Questra 0.4.0', releaseUrl: 'https://github.com/Dark2932/Questra/releases/tag/v0.4.0',
+    publishedAt: null, releaseNotes: '测试版本'
+  };
+  const updateService = {
+    checkForUpdate: async () => { updateCalls.push('check'); return updateInfo; },
+    installLatest: async () => { updateCalls.push('install'); return { ...updateInfo, installedVersion: '0.4.0', restartRequired: true, output: 'ok' }; }
+  };
+  const app = createApp({ db, adminToken: 'legacy-token', config: { siteName: 'Questra', hooks: {} }, updateService });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -43,6 +53,14 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
 
   const settings = await fetch(`${baseUrl}/api/admin/settings`, { headers: { cookie: setupCookie } });
   assert.equal((await json(settings)).site.siteName, 'Questra');
+
+  const unauthorizedUpdate = await fetch(`${baseUrl}/api/admin/update`);
+  assert.equal(unauthorizedUpdate.status, 401);
+  const update = await fetch(`${baseUrl}/api/admin/update`, { headers: { cookie: setupCookie } });
+  assert.deepEqual(await json(update), updateInfo);
+  const install = await fetch(`${baseUrl}/api/admin/update/install`, { method: 'POST', headers: { cookie: setupCookie } });
+  assert.equal((await json(install)).restartRequired, true);
+  assert.deepEqual(updateCalls, ['check', 'install']);
 
   const nickname = await fetch(`${baseUrl}/api/admin/settings/account`, {
     method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
@@ -110,6 +128,7 @@ test('旧数据库可以通过新增迁移升级到管理员账户结构', (t) =
     db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', name), 'utf8'));
     db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(name);
   }
-  assert.deepEqual(migrate(db), ['004_admin_accounts_settings.sql']);
+  assert.deepEqual(migrate(db), ['004_admin_accounts_settings.sql', '005_survey_question_revisions.sql']);
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'admin_accounts'").get());
+  assert.ok(db.prepare("SELECT name FROM pragma_table_info('survey_questions') WHERE name = 'is_active'").get());
 });

@@ -75,6 +75,41 @@ test('题目深拷贝、Token 鉴权和答卷提交流程', async (t) => {
   const responseData = await responses.json();
   assert.equal(responseData.responses.length, 1);
   assert.equal(responseData.responses[0].answers[publicSurvey.questions[0].id].value, 'A');
+
+  const replacementQuestion = await (await fetch(`${baseUrl}/api/admin/questions`, {
+    method: 'POST', headers: adminHeaders,
+    body: JSON.stringify({ title: '替换后的考试题', type: 'single', options: ['正确', '错误'], required: true, correctAnswer: '正确' })
+  })).json();
+  const update = await fetch(`${baseUrl}/api/admin/surveys/${survey.id}`, {
+    method: 'PUT', headers: adminHeaders,
+    body: JSON.stringify({
+      kind: 'exam', title: '已改为考试', description: '结构已经更新', status: 'active',
+      expiresAt: '2030-01-01T00:00:00.000Z', selectionMode: 'manual', questionIds: [replacementQuestion.id],
+      scoringMode: 'per_question', questionScores: { [replacementQuestion.id]: 25 }
+    })
+  });
+  assert.equal(update.status, 200);
+  const updated = await update.json();
+  assert.equal(updated.id, survey.id);
+  assert.equal(updated.kind, 'exam');
+  assert.equal(updated.maxScore, 25);
+  assert.deepEqual(updated.questions.map((item) => item.title), ['替换后的考试题']);
+
+  const publicUpdated = await (await fetch(`${baseUrl}/api/surveys/${survey.id}`)).json();
+  assert.equal(publicUpdated.questions.length, 1);
+  assert.equal(publicUpdated.questions[0].title, '替换后的考试题');
+  const historical = await (await fetch(`${baseUrl}/api/admin/surveys/${survey.id}/responses`, { headers: adminHeaders })).json();
+  assert.equal(historical.responses.length, 1);
+  assert.equal(historical.hasScores, true);
+  assert.equal(historical.survey.questions.find((item) => item.id === publicSurvey.questions[0].id).archived, true);
+  assert.equal(historical.responses[0].answers[publicSurvey.questions[0].id].value, 'A');
+
+  const newSubmit = await fetch(`${baseUrl}/api/surveys/${survey.id}/responses`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ answers: { [publicUpdated.questions[0].id]: '正确' } })
+  });
+  assert.equal(newSubmit.status, 201);
+  assert.equal((await newSubmit.json()).score, 25);
 });
 
 test('考试权重计分、答案保密和逐题分值模式', async (t) => {
@@ -302,6 +337,29 @@ test('选填单选题允许空答案，过期问卷拒绝提交', async (t) => {
   });
   assert.equal(emptySubmit.status, 201);
 
+  await fetch(`${baseUrl}/api/admin/surveys/${survey.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ expiresAt: '2020-01-01T00:00:00.000Z' })
+  });
+  const expiredSurvey = await (await fetch(`${baseUrl}/api/admin/surveys/${survey.id}`, { headers })).json();
+  assert.equal(expiredSurvey.status, 'closed');
+  const reopenExpired = await fetch(`${baseUrl}/api/admin/surveys/${survey.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ status: 'active', title: '过期实例仍应关闭' })
+  });
+  assert.equal(reopenExpired.status, 200);
+  assert.equal((await reopenExpired.json()).status, 'closed');
+  const invalidExpiredStatus = await fetch(`${baseUrl}/api/admin/surveys/${survey.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ status: 'invalid' })
+  });
+  assert.equal(invalidExpiredStatus.status, 400);
+  const reopenWithFutureDate = await fetch(`${baseUrl}/api/admin/surveys/${survey.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ expiresAt: '2030-01-01T00:00:00.000Z', status: 'active' })
+  });
+  assert.equal(reopenWithFutureDate.status, 200);
+  assert.equal((await reopenWithFutureDate.json()).status, 'active');
   await fetch(`${baseUrl}/api/admin/surveys/${survey.id}`, {
     method: 'PUT', headers,
     body: JSON.stringify({ expiresAt: '2020-01-01T00:00:00.000Z' })

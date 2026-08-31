@@ -7,6 +7,10 @@ import SurveyDialog from './SurveyDialog';
 
 const { Title, Text } = Typography;
 
+function isExpired(survey) {
+  return Boolean(survey.expiresAt && new Date(survey.expiresAt).getTime() <= Date.now());
+}
+
 export default function Surveys() {
   const [surveys, setSurveys] = useState([]);
   const [questions, setQuestions] = useState([]);
@@ -67,7 +71,7 @@ export default function Surveys() {
                 <Button size="small" icon={<CopyOutlined />} onClick={() => copyLink(r.id)}>链接</Button>
                 <Button size="small" icon={<EditOutlined />} onClick={async () => { try { setEditing(await api.getSurvey(r.id)); setDialogOpen(true); } catch (e) { message.error(e.message); } }}>编辑</Button>
                 <Link to={`/admin/surveys/${r.id}/responses`}><Button size="small" icon={<EyeOutlined />}>数据</Button></Link>
-                <Button size="small" icon={r.status === 'active' ? <PauseCircleOutlined /> : <PlayCircleOutlined />} onClick={() => toggleStatus(r)}>
+                <Button size="small" disabled={isExpired(r)} icon={r.status === 'active' ? <PauseCircleOutlined /> : <PlayCircleOutlined />} onClick={() => toggleStatus(r)}>
                   {r.status === 'active' ? '关闭' : '开启'}
                 </Button>
                 <Popconfirm title="删除问卷会同时删除所有答卷，且无法恢复。确定继续吗？" onConfirm={() => deleteSurvey(r.id)} okText="确定" cancelText="取消">

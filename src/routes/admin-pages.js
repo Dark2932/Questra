@@ -15,7 +15,7 @@ function createAdminPages({ db, config, surveyService }) {
     `).get();
     const recentSurveys = db.prepare(`
       SELECT s.*, (SELECT COUNT(*) FROM responses r WHERE r.survey_id = s.id) AS response_count,
-        (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id) AS question_count
+        (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id AND q.is_active = 1) AS question_count
       FROM surveys s ORDER BY s.created_at DESC LIMIT 5
     `).all();
     const trend = db.prepare(`

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Avatar, Button, Card, Checkbox, ColorPicker, Form, Input, Popover, Space, Tabs, Typography, Upload, App } from 'antd';
-import { BgColorsOutlined, DeleteOutlined, LockOutlined, PictureOutlined, SafetyCertificateOutlined, SettingOutlined, UndoOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
+import { BgColorsOutlined, CloudDownloadOutlined, DeleteOutlined, LockOutlined, PictureOutlined, ReloadOutlined, SafetyCertificateOutlined, SettingOutlined, UndoOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { api } from '../../api';
 import { DEFAULT_SITE_ICON, emojiSiteIconUrl } from '../../lib/siteIcon';
@@ -22,7 +22,6 @@ function siteCharacters(value) {
 
 export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
   const [data, setData] = useState(null);
-  const [siteForm] = Form.useForm();
   const [personalizationForm] = Form.useForm();
   const [accountForm] = Form.useForm();
   const [initialColorFormat, setInitialColorFormat] = useState('rgb');
@@ -30,12 +29,16 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateInstalling, setUpdateInstalling] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [installResult, setInstallResult] = useState(null);
   const { message, modal } = App.useApp();
-  const siteIcon = Form.useWatch('siteIcon', siteForm);
-  const siteName = Form.useWatch('siteName', siteForm);
-  const siteInitial = Form.useWatch('siteInitial', siteForm);
-  const siteIconAsInitial = Form.useWatch('siteIconAsInitial', siteForm) || false;
-  const siteInitialColor = Form.useWatch('siteInitialColor', siteForm) || '#0D9488';
+  const siteIcon = Form.useWatch('siteIcon', personalizationForm);
+  const siteName = Form.useWatch('siteName', personalizationForm);
+  const siteInitial = Form.useWatch('siteInitial', personalizationForm);
+  const siteIconAsInitial = Form.useWatch('siteIconAsInitial', personalizationForm) || false;
+  const siteInitialColor = Form.useWatch('siteInitialColor', personalizationForm) || '#0D9488';
   const themeColor = Form.useWatch('themeColor', personalizationForm) || '#0D9488';
   const characters = siteCharacters(siteName);
   const setColor = (form, field) => (color, css) => form.setFieldValue(field, css || color?.toCssString?.() || '#0D9488');
@@ -43,21 +46,10 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
   useEffect(() => {
     api.getSettings().then((settings) => {
       setData(settings);
-      siteForm.setFieldsValue(settings.site);
-      personalizationForm.setFieldsValue({ themeColor: settings.site.themeColor });
+      personalizationForm.setFieldsValue(settings.site);
       accountForm.setFieldsValue(settings.account);
     }).catch((e) => message.error(e.message));
-  }, [accountForm, message, personalizationForm, siteForm]);
-
-  const saveSite = async (values) => {
-    setSaving(true);
-    try {
-      const result = await api.updateSiteSettings(values);
-      setData((prev) => ({ ...prev, site: result.site }));
-      await onRefresh();
-      message.success('站点设置已保存');
-    } catch (e) { message.error(e.message); } finally { setSaving(false); }
-  };
+  }, [accountForm, message, personalizationForm]);
 
   const savePersonalization = async (values) => {
     setSaving(true);
@@ -90,49 +82,24 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
     if (!file.type.startsWith('image/')) { message.error('请选择图片文件'); return Upload.LIST_IGNORE; }
     if (file.size > 1024 * 1024) { message.error('站点图标不能超过 1 MB'); return Upload.LIST_IGNORE; }
     const reader = new window.FileReader();
-    reader.onload = () => siteForm.setFieldValue('siteIcon', reader.result);
+    reader.onload = () => personalizationForm.setFieldValue('siteIcon', reader.result);
     reader.readAsDataURL(file);
     return false;
-  };
-
-  const confirmRestoreSite = () => {
-    modal.confirm({
-      title: '确认恢复站点默认设置？',
-      content: '站点名称、图标、标识字符和标识背景色将恢复为默认值。此操作会立即保存。',
-      okText: '确认恢复',
-      cancelText: '取消',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        setSaving(true);
-        try {
-          const result = await api.updateSiteSettings(DEFAULT_SITE_SETTINGS);
-          setData((prev) => ({ ...prev, site: result.site }));
-          siteForm.setFieldsValue(result.site);
-          await onRefresh();
-          message.success('站点设置已恢复为默认值');
-        } catch (e) {
-          message.error(e.message);
-          throw e;
-        } finally {
-          setSaving(false);
-        }
-      },
-    });
   };
 
   const confirmRestorePersonalization = () => {
     modal.confirm({
       title: '确认恢复个性化默认设置？',
-      content: '主题色将恢复为默认值。此操作会立即保存。',
+      content: '站点名称、图标、标识字符、标识背景色和主题色将恢复为默认值。此操作会立即保存。',
       okText: '确认恢复',
       cancelText: '取消',
       okButtonProps: { danger: true },
       onOk: async () => {
         setSaving(true);
         try {
-          const result = await api.updateSiteSettings(DEFAULT_PERSONALIZATION_SETTINGS);
+          const result = await api.updateSiteSettings({ ...DEFAULT_SITE_SETTINGS, ...DEFAULT_PERSONALIZATION_SETTINGS });
           setData((prev) => ({ ...prev, site: result.site }));
-          personalizationForm.setFieldsValue(DEFAULT_PERSONALIZATION_SETTINGS);
+          personalizationForm.setFieldsValue(result.site);
           await onRefresh();
           message.success('个性化设置已恢复为默认值');
         } catch (e) {
@@ -147,42 +114,81 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
 
   const selectEmoji = (emoji) => {
     if (!String(emoji || '').trim()) return;
-    siteForm.setFieldValue('siteIcon', emojiSiteIconUrl(emoji));
+    personalizationForm.setFieldValue('siteIcon', emojiSiteIconUrl(emoji));
     setEmojiInput('');
     setEmojiOpen(false);
+  };
+
+  const checkForUpdate = async () => {
+    setUpdateChecking(true);
+    setInstallResult(null);
+    try {
+      const result = await api.checkForUpdate();
+      setUpdateInfo(result);
+      if (result.updateAvailable) message.success(`发现新版本 ${result.latestVersion}`);
+      else if (result.previewVersion) message.warning('当前正在运行开发预览版');
+      else message.success('当前已经是最新版本');
+    } catch (error) {
+      message.error(error.message);
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
+
+  const confirmInstallUpdate = () => {
+    if (!updateInfo?.updateAvailable) return;
+    modal.confirm({
+      title: `确认安装 Questra ${updateInfo.latestVersion}？`,
+      content: '服务器将使用 npm 全局安装该版本。安装期间请勿关闭 Questra，完成后需要重启服务才能运行新版本。',
+      okText: '确认安装',
+      cancelText: '取消',
+      onOk: async () => {
+        setUpdateInstalling(true);
+        try {
+          const result = await api.installUpdate();
+          setUpdateInfo(result);
+          setInstallResult(result);
+          message.success(`Questra ${result.installedVersion} 已安装，请重启服务`);
+        } catch (error) {
+          message.error(error.message);
+          throw error;
+        } finally {
+          setUpdateInstalling(false);
+        }
+      },
+    });
   };
 
   if (!data) return <Card loading />;
 
   const items = [
-    { key: 'site', label: <Space><SettingOutlined />站点设置</Space>, children: <Form form={siteForm} layout="vertical" onFinish={saveSite} style={{ maxWidth: 720 }}>
-      <Title level={4}>站点设置</Title><Paragraph type="secondary">站点信息相关设置</Paragraph>
+    { key: 'site', label: <Space><SettingOutlined />站点设置</Space>, children: <div style={{ maxWidth: 720 }}>
+      <Title level={4}>站点设置</Title><Paragraph type="secondary">此处可更改站点内部分系统性设置。</Paragraph>
+    </div> },
+    { key: 'personalization', label: <Space><BgColorsOutlined />个性化</Space>, children: <Form form={personalizationForm} layout="vertical" onFinish={savePersonalization} style={{ maxWidth: 720 }}>
+      <Title level={4}>个性化</Title><Paragraph type="secondary">此处可调整站点外观、标识和界面主题。</Paragraph>
       <Form.Item name="siteName" label="站点名称"><Input maxLength={80} placeholder="Questra" /></Form.Item>
+      <Form.Item name="siteIcon" label="站点图标"><Input prefix={<PictureOutlined />} placeholder="支持填入图片 URL、站内路径，也可上传图片或使用 Emoji" /></Form.Item>
+      <div style={{ marginBottom: 24 }}><Space align="start"><Avatar shape="square" size={48} style={{ background: 'transparent', fontSize: 30 }} src={siteIcon || undefined}>{!siteIcon && DEFAULT_SITE_ICON}</Avatar><Upload accept="image/*" showUploadList={false} beforeUpload={readIcon}><Space direction="vertical" size={0}><Button icon={<UploadOutlined />}>上传图片</Button><Text type="secondary" className="upload-help">最大 1 MB</Text></Space></Upload><Popover open={emojiOpen} onOpenChange={setEmojiOpen} trigger="click" placement="bottomLeft" arrow={false} content={<div className="emoji-picker"><Space.Compact block><Input value={emojiInput} onChange={(event) => setEmojiInput(event.target.value)} onPressEnter={() => selectEmoji(emojiInput)} placeholder="输入或粘贴任意 Emoji" /><Button type="primary" disabled={!emojiInput.trim()} onClick={() => selectEmoji(emojiInput)}>使用</Button></Space.Compact><EmojiPicker width="100%" height={360} autoFocusSearch={false} lazyLoadEmojis searchPlaceHolder="搜索 Emoji" previewConfig={{ showPreview: false }} theme={resolvedTheme === 'dark' ? EmojiTheme.DARK : EmojiTheme.LIGHT} onEmojiClick={({ emoji }) => selectEmoji(emoji)} /></div>}><Button>使用 Emoji</Button></Popover><Button icon={<DeleteOutlined />} disabled={!siteIcon} onClick={() => personalizationForm.setFieldValue('siteIcon', '')}>清空图片</Button></Space></div>
       <div className="site-identity-row">
-        <Form.Item name="siteInitial" label="标识字符" extra="可输入任意文本，页面显示其第一个字符；留空时使用站点名称的第一个字符。">
-          <Input placeholder={characters[0]} />
+        <Form.Item name="siteInitial" label="标识字符" className={siteIconAsInitial ? 'site-identity-disabled' : ''} extra="只显示输入文本的第一个字符；留空时使用站点名称的第一个字符。">
+          <Input disabled={siteIconAsInitial} placeholder={characters[0]} />
+        </Form.Item>
+        <Form.Item name="siteInitialColor" label="标识背景色" className={siteIconAsInitial ? 'site-identity-disabled' : ''} style={{ width: 190 }} extra="标识字符的背景底色，与主题色无关。">
+          <ColorPicker disabled={siteIconAsInitial} format={initialColorFormat} onFormatChange={(format) => setInitialColorFormat(format || 'rgb')} showText value={siteInitialColor} onChange={setColor(personalizationForm, 'siteInitialColor')} />
         </Form.Item>
         <Form.Item name="siteIconAsInitial" valuePropName="checked" className="site-icon-as-initial">
           <Checkbox>使用站点图标</Checkbox>
         </Form.Item>
-        <Form.Item name="siteInitialColor" label="标识背景色" style={{ width: 190 }}>
-          <ColorPicker format={initialColorFormat} onFormatChange={(format) => setInitialColorFormat(format || 'rgb')} showText value={siteInitialColor} onChange={setColor(siteForm, 'siteInitialColor')} />
-        </Form.Item>
         <Space direction="vertical" align="center" size={4} className="site-identity-preview"><SiteMark size={40} siteName={siteName} siteInitial={siteInitial} siteInitialColor={siteInitialColor} siteIcon={siteIcon} siteIconAsInitial={siteIconAsInitial} /><Text type="secondary">预览</Text></Space>
       </div>
-      <Form.Item name="siteIcon" label="站点图标"><Input prefix={<PictureOutlined />} placeholder="图片 URL、站内路径或上传小图标" /></Form.Item>
-      <div style={{ marginBottom: 24 }}><Space align="start"><Avatar shape="square" size={48} style={{ background: 'transparent', fontSize: 30 }} src={siteIcon || undefined}>{!siteIcon && DEFAULT_SITE_ICON}</Avatar><Upload accept="image/*" showUploadList={false} beforeUpload={readIcon}><Space direction="vertical" size={0}><Button icon={<UploadOutlined />}>上传图片</Button><Text type="secondary" className="upload-help">最大 1 MB</Text></Space></Upload><Popover open={emojiOpen} onOpenChange={setEmojiOpen} trigger="click" placement="bottomLeft" arrow={false} content={<div className="emoji-picker"><Space.Compact block><Input value={emojiInput} onChange={(event) => setEmojiInput(event.target.value)} onPressEnter={() => selectEmoji(emojiInput)} placeholder="输入或粘贴任意 Emoji" /><Button type="primary" disabled={!emojiInput.trim()} onClick={() => selectEmoji(emojiInput)}>使用</Button></Space.Compact><EmojiPicker width="100%" height={360} autoFocusSearch={false} lazyLoadEmojis searchPlaceHolder="搜索 Emoji" previewConfig={{ showPreview: false }} theme={resolvedTheme === 'dark' ? EmojiTheme.DARK : EmojiTheme.LIGHT} onEmojiClick={({ emoji }) => selectEmoji(emoji)} /></div>}><Button>使用 Emoji</Button></Popover><Button icon={<DeleteOutlined />} disabled={!siteIcon} onClick={() => siteForm.setFieldValue('siteIcon', '')}>清空图片</Button></Space></div>
-      <Space><Button type="primary" htmlType="submit" loading={saving}>保存站点设置</Button><Button danger icon={<UndoOutlined />} disabled={saving} onClick={confirmRestoreSite}>恢复默认设置</Button></Space>
-    </Form> },
-    { key: 'personalization', label: <Space><BgColorsOutlined />个性化</Space>, children: <Form form={personalizationForm} layout="vertical" onFinish={savePersonalization} style={{ maxWidth: 620 }}>
-      <Title level={4}>个性化</Title><Paragraph type="secondary">个性化相关设置</Paragraph>
-      <Form.Item name="themeColor" label="主题色">
+      <Form.Item name="themeColor" label="主题色" extra="按钮等高亮元素的配色。">
         <ColorPicker format={themeColorFormat} onFormatChange={(format) => setThemeColorFormat(format || 'rgb')} showText value={themeColor} onChange={setColor(personalizationForm, 'themeColor')} />
       </Form.Item>
       <Space><Button type="primary" htmlType="submit" loading={saving}>保存个性化设置</Button><Button danger icon={<UndoOutlined />} disabled={saving} onClick={confirmRestorePersonalization}>恢复默认设置</Button></Space>
     </Form> },
     { key: 'account', label: <Space><SafetyCertificateOutlined />账户安全</Space>, children: <Form form={accountForm} layout="vertical" onFinish={saveAccount} style={{ maxWidth: 620 }}>
-      <Title level={4}>账户安全</Title><Paragraph type="secondary">账户安全相关设置</Paragraph>
+      <Title level={4}>账户安全</Title><Paragraph type="secondary">可以更改账号、密码等安全相关信息。</Paragraph>
       <Alert type="info" showIcon message="只修改昵称时无需填写当前密码。" style={{ marginBottom: 20 }} />
       <Form.Item name="nickname" label="管理员昵称" rules={[{ required: true, message: '请输入管理员昵称' }]}><Input prefix={<UserOutlined />} maxLength={40} /></Form.Item>
       <Form.Item name="username" label="登录账号" rules={[{ required: true, message: '请输入登录账号' }, { pattern: /^[a-zA-Z0-9_.-]{3,32}$/, message: '使用 3-32 位字母、数字、下划线、点或短横线' }]}><Input prefix={<UserOutlined />} autoComplete="username" /></Form.Item>
@@ -190,7 +196,32 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
       <Form.Item name="newPassword" label="新密码" rules={[{ min: 8, message: '新密码至少 8 位' }]}><Input.Password prefix={<LockOutlined />} autoComplete="new-password" placeholder="不修改时留空" /></Form.Item>
       <Form.Item name="confirmPassword" label="确认新密码" dependencies={['newPassword']} rules={[({ getFieldValue }) => ({ validator(_, value) { return !getFieldValue('newPassword') || value === getFieldValue('newPassword') ? Promise.resolve() : Promise.reject(new Error('两次密码不一致')); } })]}><Input.Password prefix={<LockOutlined />} autoComplete="new-password" /></Form.Item>
       <Button type="primary" htmlType="submit" loading={saving}>保存账户设置</Button>
-    </Form> }
+    </Form> },
+    { key: 'update', label: <Space><CloudDownloadOutlined />更新</Space>, children: <div style={{ maxWidth: 680 }}>
+      <Title level={4}>更新</Title><Paragraph type="secondary">从 GitHub Releases 检测正式版本，并使用 npm 安装更新。</Paragraph>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Space wrap>
+          <Button type="primary" icon={<ReloadOutlined />} loading={updateChecking} disabled={updateInstalling} onClick={checkForUpdate}>检测更新</Button>
+          <Button icon={<CloudDownloadOutlined />} loading={updateInstalling} disabled={!updateInfo?.updateAvailable || updateChecking} onClick={confirmInstallUpdate}>安装新版本</Button>
+        </Space>
+        {!updateInfo && <Alert type="info" showIcon message="尚未检测更新" description="检测过程会访问 Questra 的 GitHub Releases，不会自动安装任何内容。" />}
+        {updateInfo && <Alert
+          type={updateInfo.updateAvailable || updateInfo.previewVersion ? 'warning' : 'success'}
+          showIcon
+          message={updateInfo.updateAvailable ? `发现新版本 ${updateInfo.latestVersion}` : updateInfo.previewVersion ? `开发预览版 ${updateInfo.currentVersion}` : `当前已是最新版本 ${updateInfo.currentVersion}`}
+          description={<Space direction="vertical" size={4}>
+            <Text>当前版本：{updateInfo.currentVersion}；最新正式版本：{updateInfo.latestVersion}</Text>
+            {updateInfo.previewVersion && <Text>当前版本高于最新正式版本，可能包含尚未发布的功能。</Text>}
+            <Typography.Link href="https://github.com/Dark2932/Questra/releases" target="_blank" rel="noreferrer">查看 GitHub Releases</Typography.Link>
+            {updateInfo.publishedAt && <Text type="secondary">最新正式版发布时间：{new Date(updateInfo.publishedAt).toLocaleString('zh-CN', { hour12: false })}</Text>}
+          </Space>}
+        />}
+        {updateInfo?.releaseNotes && <div><Text strong>最新正式版说明</Text><Paragraph className="update-release-notes">{updateInfo.releaseNotes}</Paragraph></div>}
+        {installResult && <Alert type="success" showIcon message={`Questra ${installResult.installedVersion} 安装完成`} description="请重启 Questra 服务。重启前，当前进程仍然运行旧版本。" />}
+        {installResult?.output && <details className="update-install-output"><summary>查看 npm 输出</summary><pre>{installResult.output}</pre></details>}
+        <Text type="secondary">此功能需要服务器能够访问 GitHub 和 npm，并拥有写入 npm 全局安装目录的权限。源码运行或权限不足时，可按安装文档手动升级。</Text>
+      </Space>
+    </div> }
   ];
 
   return <Space direction="vertical" size={24} style={{ width: '100%' }}>

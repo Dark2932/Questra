@@ -1,13 +1,13 @@
 'use strict';
 
 const express = require('express');
-const { HttpError } = require('../lib/http');
+const { asyncRoute, HttpError } = require('../lib/http');
 const { parseJson, serializeQuestion, serializeSurvey } = require('../lib/serializers');
 const { getAdminAccount, serializeAccount, updateAdminAccount } = require('../admin-account');
 const { deleteAccountSessions } = require('../admin-session');
 const { getSiteSettings, updateSiteSettings } = require('../settings');
 
-function createAdminApi({ db, surveyService, config, app }) {
+function createAdminApi({ db, surveyService, config, app, updateService }) {
   const router = express.Router();
 
   router.get('/dashboard', (req, res) => {
@@ -29,7 +29,7 @@ function createAdminApi({ db, surveyService, config, app }) {
     `).all();
     const recentSurveys = db.prepare(`
       SELECT s.*, (SELECT COUNT(*) FROM responses r WHERE r.survey_id = s.id) AS response_count,
-        (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id) AS question_count
+        (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id AND q.is_active = 1) AS question_count
       FROM surveys s ORDER BY s.created_at DESC LIMIT 5
     `).all();
     res.json({ totals, trend, recentSurveys });
@@ -63,6 +63,14 @@ function createAdminApi({ db, surveyService, config, app }) {
     if (requiresLogin) deleteAccountSessions(db, account.id);
     res.json({ account, requiresLogin });
   });
+
+  router.get('/update', asyncRoute(async (req, res) => {
+    res.json(await updateService.checkForUpdate());
+  }));
+
+  router.post('/update/install', asyncRoute(async (req, res) => {
+    res.json(await updateService.installLatest());
+  }));
 
   router.get('/questions', (req, res) => {
     const rows = db.prepare('SELECT * FROM question_pool ORDER BY updated_at DESC, id DESC').all();
@@ -121,7 +129,7 @@ function createAdminApi({ db, surveyService, config, app }) {
   router.get('/surveys', (req, res) => {
     const rows = db.prepare(`
       SELECT s.*,
-        (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id) AS question_count,
+        (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id AND q.is_active = 1) AS question_count,
         (SELECT COUNT(*) FROM responses r WHERE r.survey_id = s.id) AS response_count
       FROM surveys s ORDER BY s.created_at DESC
     `).all();
@@ -150,7 +158,21 @@ function createAdminApi({ db, surveyService, config, app }) {
     const survey = surveyService.getSurvey(req.params.id, true, true);
     const responseRows = db.prepare('SELECT * FROM responses WHERE survey_id = ? ORDER BY submitted_at ASC').all(req.params.id);
     const answersByResponse = db.prepare('SELECT survey_question_id, value_json FROM answers WHERE response_id = ?');
-    const questions = survey.questions.map((q) => ({ id: q.id, title: q.title }));
+    const exportQuestions = db.prepare(`
+      SELECT q.* FROM survey_questions q
+      WHERE q.survey_id = ? AND (
+        q.is_active = 1 OR EXISTS (SELECT 1 FROM answers a WHERE a.survey_question_id = q.id)
+      )
+      ORDER BY q.id
+    `).all(req.params.id);
+    survey.questions = exportQuestions.map((question) => ({
+      ...serializeQuestion(question, { includeAnswer: true }),
+      archived: !question.is_active
+    }));
+    const questions = survey.questions.map((question) => ({
+      id: question.id,
+      title: question.title + (question.archived ? '（历史）' : '')
+    }));
 
     const rows = responseRows.map((response) => {
       const answers = Object.fromEntries(answersByResponse.all(response.id).map((answer) => [
@@ -165,6 +187,7 @@ function createAdminApi({ db, surveyService, config, app }) {
       };
     });
 
+    const includeScores = survey.kind === 'exam' || rows.some((row) => row.score !== null);
     const format = String(req.query.format || 'csv').toLowerCase();
     if (format === 'json') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -175,14 +198,14 @@ function createAdminApi({ db, surveyService, config, app }) {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="survey-${survey.id}.csv"`);
     // UTF-8 BOM 让 Excel 正确识别中文。
-    const header = ['提交时间', ...questions.map((q) => q.title), ...(survey.kind === 'exam' ? ['得分', '满分'] : [])];
+    const header = ['提交时间', ...questions.map((q) => q.title), ...(includeScores ? ['得分', '满分'] : [])];
     const lines = [header, ...rows.map((row) => [
       row.submittedAt,
       ...questions.map((q) => {
         const value = row.answers[q.id];
         return Array.isArray(value) ? value.join('、') : (value === null || value === undefined ? '' : String(value));
       }),
-      ...(survey.kind === 'exam' ? [row.score ?? '', row.maxScore ?? ''] : [])
+      ...(includeScores ? [row.score ?? '', row.maxScore ?? ''] : [])
     ])];
     const csv = lines.map((line) => line.map((cell) => {
       const text = String(cell);
@@ -193,6 +216,16 @@ function createAdminApi({ db, surveyService, config, app }) {
 
   router.get('/surveys/:id/responses', (req, res) => {
     const survey = surveyService.getSurvey(req.params.id, true, true);
+    survey.questions = db.prepare(`
+      SELECT q.* FROM survey_questions q
+      WHERE q.survey_id = ? AND (
+        q.is_active = 1 OR EXISTS (SELECT 1 FROM answers a WHERE a.survey_question_id = q.id)
+      )
+      ORDER BY q.id
+    `).all(req.params.id).map((question) => ({
+      ...serializeQuestion(question, { includeAnswer: true }),
+      archived: !question.is_active
+    }));
     const responseRows = db.prepare('SELECT * FROM responses WHERE survey_id = ? ORDER BY submitted_at DESC').all(req.params.id);
     const answersByResponse = db.prepare(`
       SELECT a.survey_question_id, a.value_json, a.is_correct, a.awarded_score
@@ -212,7 +245,7 @@ function createAdminApi({ db, surveyService, config, app }) {
         }
       ]))
     }));
-    res.json({ survey, responses });
+    res.json({ survey, responses, hasScores: survey.kind === 'exam' || responses.some((response) => response.score !== null) });
   });
 
   return router;

@@ -53,6 +53,7 @@ export default function Survey({ siteName }) {
       colorBgBase: resolvedTheme === 'dark' ? '#000000' : '#ffffff',
       colorBgLayout: resolvedTheme === 'dark' ? '#000000' : '#f5f5f7',
       colorBgContainer: resolvedTheme === 'dark' ? '#1c1c1e' : '#ffffff',
+      colorBgElevated: resolvedTheme === 'dark' ? '#2c2c2e' : '#ffffff',
       colorTextBase: resolvedTheme === 'dark' ? '#f5f5f7' : '#1d1d1f',
       colorTextSecondary: resolvedTheme === 'dark' ? '#98989d' : '#6e6e73',
       colorBorderSecondary: resolvedTheme === 'dark' ? '#38383a' : '#e5e5ea',

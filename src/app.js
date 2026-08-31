@@ -13,13 +13,14 @@ const { createRateLimit } = require('./middleware/rate-limit');
 const { createAdminAccount, getAdminAccount, serializeAccount, verifyPassword } = require('./admin-account');
 const { createSession, deleteSession } = require('./admin-session');
 const { DEFAULT_SITE_ICON_URL, getSiteSettings, updateSiteSettings } = require('./settings');
+const { createUpdateService } = require('./update-service');
 
 function setSessionCookie(res, token, secure = false) {
   const secureFlag = secure ? '; Secure' : '';
   res.setHeader('Set-Cookie', `questra_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Max-Age=604800; SameSite=Lax${secureFlag}`);
 }
 
-function createApp({ db, config, adminToken }) {
+function createApp({ db, config, adminToken, updateService = createUpdateService() }) {
   const app = express();
   const siteSettings = getSiteSettings(db, config.siteName || 'Questra');
   config.siteName = siteSettings.siteName;
@@ -142,7 +143,7 @@ function createApp({ db, config, adminToken }) {
 
   app.get('/', (req, res) => res.redirect('/admin'));
   app.use(createPublicRoutes({ db, config, surveyService, submitLimiter }));
-  app.use('/api/admin', adminWriteLimiter, adminAuth, createAdminApi({ db, surveyService, config, app }));
+  app.use('/api/admin', adminWriteLimiter, adminAuth, createAdminApi({ db, surveyService, config, app, updateService }));
 
   if (spaAvailable) {
     app.use('/assets', express.static(path.join(distPath, 'assets'), { maxAge: '1h', immutable: true }));
@@ -176,7 +177,7 @@ function createApp({ db, config, adminToken }) {
     const status = Number(error.status) || 500;
     if (status >= 500) console.error(error.stack || error.message);
     if (req.path.startsWith('/api/')) {
-      return res.status(status).json({ error: status >= 500 ? '服务器处理失败' : error.message });
+      return res.status(status).json({ error: status >= 500 && !error.expose ? '服务器处理失败' : error.message });
     }
     if (spaAvailable) return res.sendFile(path.join(distPath, 'index.html'));
     res.status(status).render('error', {

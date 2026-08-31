@@ -80,7 +80,7 @@ module.exports = {
 
 ## 数据库和迁移
 
-当前核心表包括 `question_pool`、`question_groups`、`question_group_items`、`surveys`、`survey_questions`、`responses` 和 `answers`，管理员认证使用 `admin_accounts`、`admin_sessions`、`app_settings`。已有迁移不能修改；新增结构使用下一个编号，并同时覆盖空库和已有库升级测试。考虑 WAL、外键级联、备份恢复和历史快照兼容。
+当前核心表包括 `question_pool`、`question_groups`、`question_group_items`、`surveys`、`survey_questions`、`responses` 和 `answers`，管理员认证使用 `admin_accounts`、`admin_sessions`、`app_settings`。`survey_questions.is_active` 区分当前题目结构与仍被历史答卷引用的旧快照；结构编辑不得删除历史答卷。已有迁移不能修改；新增结构使用下一个编号，并同时覆盖空库和已有库升级测试。考虑 WAL、外键级联、备份恢复和历史快照兼容。
 
 ## API 开发
 

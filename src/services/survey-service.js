@@ -52,11 +52,11 @@ function createSurveyService(db) {
   const poolById = db.prepare('SELECT * FROM question_pool WHERE id = ?');
   const surveyById = db.prepare(`
     SELECT s.*,
-      (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id) AS question_count,
+      (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id AND q.is_active = 1) AS question_count,
       (SELECT COUNT(*) FROM responses r WHERE r.survey_id = s.id) AS response_count
     FROM surveys s WHERE s.id = ?
   `);
-  const questionsBySurvey = db.prepare('SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY sort_order, id');
+  const questionsBySurvey = db.prepare('SELECT * FROM survey_questions WHERE survey_id = ? AND is_active = 1 ORDER BY sort_order, id');
 
   function listGroups() {
     const rows = db.prepare('SELECT g.*, COUNT(gi.question_id) AS question_count FROM question_groups g LEFT JOIN question_group_items gi ON gi.group_id = g.id GROUP BY g.id ORDER BY g.name COLLATE NOCASE').all();
@@ -195,13 +195,14 @@ function createSurveyService(db) {
 
   function updateSurvey(id, input = {}) {
     const current = getSurvey(id, true, true);
-    const responses = Number(current.responseCount || 0);
     const title = input.title === undefined ? current.title : String(input.title).trim();
     const description = input.description === undefined ? current.description : String(input.description).trim();
-    const status = input.status === undefined ? current.status : String(input.status);
     const expiresAt = input.expiresAt === undefined ? current.expiresAt : parseOptionalDate(input.expiresAt);
+    const requestedStatus = input.status === undefined ? current.status : String(input.status);
+    if (!['active', 'closed'].includes(requestedStatus)) throw new HttpError(400, '问卷状态无效');
+    const expired = Boolean(expiresAt && new Date(expiresAt).getTime() <= Date.now());
+    const status = expired ? 'closed' : requestedStatus;
     if (!title) throw new HttpError(400, '问卷标题不能为空');
-    if (!['active', 'closed'].includes(status)) throw new HttpError(400, '问卷状态无效');
     const structuralKeys = ['questionIds', 'selectionMode', 'sourceGroupId', 'randomCounts', 'kind', 'scoringMode', 'totalScore', 'typeWeights', 'questionScores'];
     const structural = structuralKeys.some((key) => {
       if (input[key] === undefined) return false;
@@ -211,7 +212,6 @@ function createSurveyService(db) {
       if (key === 'questionIds') return JSON.stringify(input[key]) !== JSON.stringify(current.questions.map((question) => question.poolQuestionId));
       return true;
     });
-    if (responses && structural) throw new HttpError(409, '已有答卷的实例只能修改基本信息');
     if (!structural) {
       db.prepare("UPDATE surveys SET title=?, description=?, status=?, expires_at=?, updated_at=datetime('now') WHERE id=?").run(title, description, status, expiresAt, id);
       return getSurvey(id, true, true);
@@ -232,13 +232,22 @@ function createSurveyService(db) {
       questionScores: input.questionScores || current.scoringConfig?.questionScores
     });
     db.transaction(() => {
-      db.prepare('DELETE FROM surveys WHERE id=?').run(id);
-      const old = db.prepare('SELECT * FROM surveys WHERE id=?').get(replacement.id);
-      db.prepare('INSERT INTO surveys(id,title,description,status,expires_at,created_at,updated_at,kind,scoring_mode,max_score,scoring_config_json,selection_mode,source_group_id,selection_config_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id, title, description, status, expiresAt, old.created_at, new Date().toISOString(), old.kind, old.scoring_mode, old.max_score, old.scoring_config_json, old.selection_mode, old.source_group_id, old.selection_config_json);
-      const questions = db.prepare('SELECT * FROM survey_questions WHERE survey_id=?').all(replacement.id);
-      const insert = db.prepare('INSERT INTO survey_questions(survey_id,pool_question_id,title,type,options_json,is_required,sort_order,correct_answer_json,points,is_judgment) VALUES(?,?,?,?,?,?,?,?,?,?)');
+      const next = db.prepare('SELECT * FROM surveys WHERE id=?').get(replacement.id);
+      db.prepare(`
+        UPDATE surveys SET title=?, description=?, status=?, expires_at=?, updated_at=datetime('now'),
+          kind=?, scoring_mode=?, max_score=?, scoring_config_json=?, selection_mode=?, source_group_id=?, selection_config_json=?
+        WHERE id=?
+      `).run(title, description, status, expiresAt, next.kind, next.scoring_mode, next.max_score, next.scoring_config_json, next.selection_mode, next.source_group_id, next.selection_config_json, id);
+      db.prepare('UPDATE survey_questions SET is_active=0 WHERE survey_id=? AND is_active=1').run(id);
+      const questions = db.prepare('SELECT * FROM survey_questions WHERE survey_id=? AND is_active=1').all(replacement.id);
+      const insert = db.prepare('INSERT INTO survey_questions(survey_id,pool_question_id,title,type,options_json,is_required,sort_order,correct_answer_json,points,is_judgment,is_active) VALUES(?,?,?,?,?,?,?,?,?,?,1)');
       questions.forEach((question) => insert.run(id, question.pool_question_id, question.title, question.type, question.options_json, question.is_required, question.sort_order, question.correct_answer_json, question.points, question.is_judgment));
       db.prepare('DELETE FROM surveys WHERE id=?').run(replacement.id);
+      db.prepare(`
+        DELETE FROM survey_questions
+        WHERE survey_id=? AND is_active=0
+          AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.survey_question_id=survey_questions.id)
+      `).run(id);
     })();
     return getSurvey(id, true, true);
   }
