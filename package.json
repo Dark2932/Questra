@@ -1,6 +1,6 @@
 {
   "name": "questra",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "面向个人开发者的轻量级自托管问卷框架",
   "author": "Dark2932",
   "type": "commonjs",
