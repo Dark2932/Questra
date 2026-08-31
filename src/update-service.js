@@ -54,7 +54,7 @@ function createNpmInstaller({
   return function installVersion(version) {
     const normalized = parseVersion(version).version;
     const npmArgs = ['install', '--global', `questra@${normalized}`, '--no-audit', '--no-fund'];
-    const command = platform === 'win32' ? path.join(windowsDirectory, 'System32', 'cmd.exe') : 'npm';
+    const command = platform === 'win32' ? path.win32.join(windowsDirectory, 'System32', 'cmd.exe') : 'npm';
     const args = platform === 'win32' ? ['/d', '/s', '/c', 'npm.cmd', ...npmArgs] : npmArgs;
 
     return new Promise((resolve, reject) => {
