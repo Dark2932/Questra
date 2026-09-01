@@ -32,11 +32,11 @@ questra -V
 从 [GitHub Releases](https://github.com/Dark2932/Questra/releases) 下载对应版本的 `questra-<版本>.tgz`，然后在下载目录执行：
 
 ```text
-npm i -g ./questra-0.3.0.tgz
+npm i -g ./questra-<版本>.tgz
 questra -V
 ```
 
-将示例文件名替换为实际下载的版本。这种方式安装的是 Release 附件中的固定版本，适合离线保存或部署经过确认的构建产物。
+将`<版本>`替换为对应版本号。这种方式安装的是 Release 附件中的固定版本，适合离线保存或部署经过确认的构建产物。
 
 ### 从源码构建
 

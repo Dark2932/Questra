@@ -40,11 +40,11 @@ questra --version
 2. 在下载目录执行本地全局安装：
 
 ```text
-npm install --global ./questra-0.3.0.tgz
+npm install --global ./questra-<版本>.tgz
 questra --version
 ```
 
-将文件名改为实际版本。`.tgz` 是 npm 包归档，不是可直接交给 Node 执行的脚本；安装后使用包注册的 `questra` 命令。
+将`<版本>`改为对应版本号。`.tgz` 是 npm 包归档，不是可直接交给 Node 执行的脚本；安装后使用包注册的 `questra` 命令。
 
 ### 源码构建
 

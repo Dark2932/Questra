@@ -9,5 +9,6 @@
 | 修改源码、写扩展或参与发布 | [开发与扩展](development.md) |
 | 调用 HTTP 接口或编写自动化 | [HTTP API](api.md) |
 | 查找全局命令、选项或 package.json 脚本 | [命令参考](commands.md) |
+| 查看待实施功能和架构设计 | [方案书](proposal/README.md) |
 
 README 只提供最短上手路径；专题文档包含步骤背后的规则、边界和运维注意事项。
