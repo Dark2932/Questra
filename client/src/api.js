@@ -25,6 +25,8 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   getDashboard: () => request('/admin/dashboard'),
   getSettings: () => request('/admin/settings'),
+  getUserSettings: () => request('/admin/user-settings'),
+  updateUserSettings: (data) => request('/admin/user-settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateSiteSettings: (data) => request('/admin/settings/site', { method: 'PUT', body: JSON.stringify(data) }),
   updateAccountSettings: (data) => request('/admin/settings/account', { method: 'PUT', body: JSON.stringify(data) }),
   checkForUpdate: () => request('/admin/update'),
@@ -46,9 +48,10 @@ export const api = {
   updateSurvey: (id, data) => request(`/admin/surveys/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSurvey: (id) => request(`/admin/surveys/${id}`, { method: 'DELETE' }),
   getSurveyResponses: (id) => request(`/admin/surveys/${id}/responses`),
-  exportSurveyResponses: async (id, format = 'csv') => {
+  exportSurveyResponses: async (id, format = 'csv', { includePersonalInfo = false } = {}) => {
     const token = sessionStorage.getItem('questra_admin_token') || '';
-    const res = await fetch(`${API}/admin/surveys/${id}/export?format=${format}`, {
+    const params = new URLSearchParams({ format, includePersonalInfo: includePersonalInfo ? '1' : '0' });
+    const res = await fetch(`${API}/admin/surveys/${id}/export?${params}`, {
       headers: token ? { authorization: `Bearer ${token}` } : {},
       credentials: 'same-origin',
     });
@@ -72,7 +75,21 @@ export const api = {
       body: JSON.stringify({ answers }),
     }).then(async (r) => {
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || '提交失败');
+      if (!r.ok) { const error = new Error(d.error || '提交失败'); error.status = r.status; throw error; }
       return d;
     }),
+  userRegister: (data) => request('/user/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  userVerify: (token) => request('/user/auth/verify', { method: 'POST', body: JSON.stringify({ token }) }),
+  userResendVerification: (email) => request('/user/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
+  userLogin: (data) => request('/user/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  userMe: () => request('/user/auth/me'),
+  userLogout: () => request('/user/auth/logout', { method: 'POST' }),
+  userForgotPassword: (email) => request('/user/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  userResetPassword: (data) => request('/user/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
+  updateUserProfile: (displayName) => request('/user/profile', { method: 'PUT', body: JSON.stringify({ displayName }) }),
+  updateUserPassword: (data) => request('/user/password', { method: 'PUT', body: JSON.stringify(data) }),
+  getUsers: () => request('/admin/users'),
+  updateUserStatus: (id, status) => request(`/admin/users/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  revokeUserSessions: (id) => request(`/admin/users/${id}/revoke-sessions`, { method: 'POST' }),
+  deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
 };

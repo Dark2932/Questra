@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Card, Table, Statistic, Button, Typography, Space, Row, Col, Empty, App } from 'antd';
+import { Card, Table, Statistic, Button, Typography, Space, Row, Col, Empty, App, Checkbox } from 'antd';
 import { ArrowLeftOutlined, ExportOutlined, FileExcelOutlined, CloudDownloadOutlined } from '@ant-design/icons';
 import { formatAnswer } from '../../lib/format';
 import { api } from '../../api';
@@ -23,6 +23,7 @@ export default function Responses() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [includePersonalInfo, setIncludePersonalInfo] = useState(false);
   const { message } = App.useApp();
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function Responses() {
     if (exporting) return;
     setExporting(true);
     try {
-      const blob = await api.exportSurveyResponses(id, format);
+      const blob = await api.exportSurveyResponses(id, format, { includePersonalInfo });
       downloadBlob(blob, `survey-${id}.${format}`);
       message.success('导出成功');
     } catch (e) {
@@ -64,6 +65,7 @@ export default function Responses() {
           <a href={`/s/${survey.id}`} target="_blank" rel="noopener noreferrer">
             <Button icon={<ExportOutlined />}>打开问卷</Button>
           </a>
+          <Checkbox checked={includePersonalInfo} onChange={(event) => setIncludePersonalInfo(event.target.checked)}>包含个人信息</Checkbox>
           <Button icon={<FileExcelOutlined />} loading={exporting} disabled={!responses.length} onClick={() => handleExport('csv')}>导出 CSV</Button>
           <Button icon={<CloudDownloadOutlined />} loading={exporting} disabled={!responses.length} onClick={() => handleExport('json')}>导出 JSON</Button>
         </Space>
@@ -77,6 +79,7 @@ export default function Responses() {
         <Table size="small" rowKey="id" pagination={false} dataSource={responses}
           scroll={{ x: true }}
           columns={[
+            { title: '提交者', width: 150, render: (_, r) => r.participant ? `${r.participant.displayName} (${r.participant.email})` : '匿名' },
             { title: '提交时间', dataIndex: 'submittedAt', width: 180 },
             ...survey.questions.map((q) => ({ title: q.title + (q.archived ? '（历史）' : ''), key: q.id, width: 160,
               render: (_, r) => { const ans = r.answers[q.id]; return ans ? formatAnswer(ans.value) : '\u2014'; } })),

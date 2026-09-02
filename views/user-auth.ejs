@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><%= pageTitle %> - <%= siteName %></title><% if (siteIcon) { %><link rel="icon" href="<%= siteIcon %>"><% } %><link rel="stylesheet" href="/static/styles.css"></head>
+<body class="center-page" style="--questra-theme-color:<%= themeColor || '#0D9488' %>">
+  <main class="message-box auth-fallback"><h1><%= pageTitle %></h1>
+    <% if (page === 'verify') { %><p>请使用邮箱中的验证链接完成验证。</p>
+    <% } else if (page === 'profile') { %><p>账户资料页面需要前端构建产物。请运行 <code>pnpm run build</code> 后重新打开。</p>
+    <% } else { %><p>当前正在使用兼容页面。完成前端构建后可获得完整的账户操作界面。</p><a class="button primary" href="/user/login">打开用户登录</a><a class="button" href="/user/register">注册账户</a><% } %>
+    <p><a href="/admin/login">管理员登录</a></p>
+  </main>
+</body></html>

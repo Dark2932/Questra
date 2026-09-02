@@ -5,7 +5,9 @@
   <main class="survey-shell">
     <div class="survey-theme-control" role="group" aria-label="问卷页面主题"><button type="button" data-theme-choice="light" title="浅色" aria-label="浅色">☀</button><button type="button" data-theme-choice="dark" title="深色" aria-label="深色">☾</button><button type="button" data-theme-choice="system" title="跟随系统" aria-label="跟随系统">◐</button></div>
     <header class="survey-intro"><h1><%= survey.title %></h1><% if (survey.description) { %><p><%= survey.description %></p><% } %><div class="survey-meta"><span><%= survey.questions.length %> 道题</span><% if (survey.kind === 'exam') { %><span>满分 <%= survey.maxScore %> 分</span><% } %><% if (survey.expiresAt) { %><span>截止 <%= new Date(survey.expiresAt).toLocaleString('zh-CN', { hour12: false }) %></span><% } %></div></header>
-    <form id="public-survey-form" data-survey-id="<%= survey.id %>" data-kind="<%= survey.kind %>">
+    <% if (accessDenied) { %>
+      <section class="message-box"><h2><%= viewer && viewer.authenticated ? '暂时无法填写' : '请登录后填写' %></h2><p>该问卷要求登录或验证邮箱后才能访问。</p><a class="button primary" href="/user/login?returnTo=<%= encodeURIComponent('/s/' + survey.id) %>">登录</a><a class="button" href="/user/register?returnTo=<%= encodeURIComponent('/s/' + survey.id) %>">注册账户</a></section>
+    <% } else { %><form id="public-survey-form" data-survey-id="<%= survey.id %>" data-kind="<%= survey.kind %>">
       <% survey.questions.forEach((question, index) => { %>
         <fieldset class="question-block" data-question-id="<%= question.id %>" data-type="<%= question.type %>">
           <legend><span class="question-number"><%= String(index + 1).padStart(2, '0') %></span><%= question.title %><% if (question.required) { %><em>必填</em><% } %><% if (survey.kind === 'exam') { %><small><%= question.points.toFixed(2).replace(/\.00$/, '') %> 分</small><% } %></legend>
@@ -17,7 +19,7 @@
         </fieldset>
       <% }) %>
       <p id="submit-error" class="form-error"></p><button class="button primary submit-button" type="submit"><%= survey.kind === 'exam' ? '提交试卷' : '提交答卷' %></button>
-    </form>
+    </form><% } %>
     <section id="thank-you" class="thank-you" hidden><span class="success-mark">✓</span><h2 id="result-title">感谢参与</h2><p id="result-message">你的答卷已成功提交。</p><div id="exam-score" class="exam-score" hidden><strong id="score-value">0</strong><span> / <b id="max-score-value">0</b> 分</span></div></section>
   </main>
   <script src="/static/survey.js"></script>

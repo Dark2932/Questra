@@ -6,11 +6,18 @@ const { TextArea } = Input;
 const { Text } = Typography;
 
 export default function SurveyForm({ survey, onSubmit }) {
-  const [answers, setAnswers] = useState({});
+  const draftKey = `questra-survey-draft:${survey.id}`;
+  const [answers, setAnswers] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(draftKey) || '{}'); } catch { return {}; }
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const setAnswer = (qid, value) => setAnswers((prev) => ({ ...prev, [qid]: value }));
+  const setAnswer = (qid, value) => setAnswers((prev) => {
+    const next = { ...prev, [qid]: value };
+    sessionStorage.setItem(draftKey, JSON.stringify(next));
+    return next;
+  });
 
   const handleSubmit = async () => {
     setError('');
@@ -24,7 +31,11 @@ export default function SurveyForm({ survey, onSubmit }) {
       }
     }
     setSubmitting(true);
-    try { await onSubmit(answers); } catch (err) { setError(err.message); }
+    try { await onSubmit(answers); sessionStorage.removeItem(draftKey); }
+    catch (err) {
+      setError(err.message);
+      if (err.status === 401) window.location.href = `/user/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+    }
     finally { setSubmitting(false); }
   };
 

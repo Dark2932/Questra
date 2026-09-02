@@ -131,7 +131,7 @@ test('旧数据库可以通过新增迁移升级到管理员账户结构', (t) =
     db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', name), 'utf8'));
     db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(name);
   }
-  assert.deepEqual(migrate(db), ['004_admin_accounts_settings.sql', '005_survey_question_revisions.sql']);
+  assert.deepEqual(migrate(db), ['004_admin_accounts_settings.sql', '005_survey_question_revisions.sql', '006_user_auth_and_access.sql']);
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'admin_accounts'").get());
   assert.ok(db.prepare("SELECT name FROM pragma_table_info('survey_questions') WHERE name = 'is_active'").get());
 });

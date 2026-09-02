@@ -9,6 +9,9 @@ const path = require('node:path');
  * @property {string} [host]
  * @property {string} [database]
  * @property {string} [siteName]
+ * @property {string} [publicUrl] 对外访问基址，用于生成验证邮件链接
+ * @property {boolean} [userRegistration] 是否允许普通用户注册
+ * @property {Object} [email] SMTP 邮件配置
  * @property {boolean} [logging] 是否将 HTTP 请求日志输出到运行终端，默认 true
  * @property {{beforeSubmit?: Function, afterSubmit?: Function}} [hooks]
  */
@@ -39,6 +42,9 @@ function loadConfig(configPath) {
     port: 3000,
     host: '0.0.0.0',
     siteName: 'Questra',
+    publicUrl: '',
+    userRegistration: true,
+    email: {},
     logging: true,
     ...userConfig,
     // 相对数据库路径始终以 Questra 安装目录为基准，而不是执行命令的目录。

@@ -11,11 +11,19 @@ import {
   SettingOutlined,
   LogoutOutlined,
   MoreOutlined,
+  UserOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import SiteMark from '../SiteMark';
 
 const { Header, Content } = Layout;
+const ADMIN_NAVIGATION_SECTIONS = ['/admin/questions', '/admin/surveys', '/admin/users', '/admin/plugins', '/admin/settings'];
+
+function adminNavigationSection(pathname) {
+  if (pathname === '/admin') return '/admin';
+  return ADMIN_NAVIGATION_SECTIONS.find((path) => pathname === path || pathname.startsWith(`${path}/`)) || '/admin';
+}
 
 export default function AdminLayout({ authenticated, site, user, onLogout, theme, resolvedTheme, onThemeChange }) {
   const navigate = useNavigate();
@@ -79,11 +87,15 @@ export default function AdminLayout({ authenticated, site, user, onLogout, theme
             <Link className={location.pathname === '/admin' ? 'active' : ''} to="/admin"><DashboardOutlined />仪表盘</Link>
             <Link className={location.pathname.startsWith('/admin/questions') ? 'active' : ''} to="/admin/questions"><FormOutlined />题库</Link>
             <Link className={location.pathname.startsWith('/admin/surveys') ? 'active' : ''} to="/admin/surveys"><UnorderedListOutlined />问卷 / 考试</Link>
+            <Link className={location.pathname.startsWith('/admin/users') ? 'active' : ''} to="/admin/users"><UserOutlined />用户</Link>
+            <Link className={location.pathname.startsWith('/admin/plugins') ? 'active' : ''} to="/admin/plugins"><AppstoreOutlined />插件</Link>
             <Link className={location.pathname.startsWith('/admin/settings') ? 'active' : ''} to="/admin/settings"><SettingOutlined />设置</Link>
             <Dropdown menu={{ items: [
               { key: '/admin', label: '仪表盘' },
               { key: '/admin/questions', label: '题库' },
               { key: '/admin/surveys', label: '问卷 / 考试' },
+              { key: '/admin/users', label: '用户' },
+              { key: '/admin/plugins', label: '插件' },
               { key: '/admin/settings', label: '设置' },
             ], onClick: ({ key }) => navigate(key) }} trigger={['click']}>
               <Button className="admin-nav-more" type="text" size="small" icon={<MoreOutlined />} aria-label="更多导航" />
@@ -109,7 +121,7 @@ export default function AdminLayout({ authenticated, site, user, onLogout, theme
 
       <Content style={{ padding: 24, maxWidth: 1200, width: '100%', marginInline: 'auto' }}>
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={`${location.pathname}${location.search}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12, ease: 'easeOut' }}>
+          <motion.div key={adminNavigationSection(location.pathname)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12, ease: 'easeOut' }}>
             {outlet}
           </motion.div>
         </AnimatePresence>

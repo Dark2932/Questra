@@ -4,10 +4,13 @@ const express = require('express');
 const { asyncRoute, HttpError } = require('../lib/http');
 const { parseJson, serializeQuestion, serializeSurvey } = require('../lib/serializers');
 const { getAdminAccount, serializeAccount, updateAdminAccount } = require('../admin-account');
+const { listUsers, getUserById, serializeUser, setUserStatus, deleteUserAndAnonymize } = require('../user-account');
 const { deleteAccountSessions } = require('../admin-session');
+const { deleteUserSessions } = require('../user-session');
+const { setSetting } = require('../settings');
 const { getSiteSettings, updateSiteSettings } = require('../settings');
 
-function createAdminApi({ db, surveyService, config, app, updateService }) {
+function createAdminApi({ db, surveyService, config, app, updateService, accessPolicy, emailService }) {
   const router = express.Router();
 
   router.get('/dashboard', (req, res) => {
@@ -62,6 +65,52 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
     const requiresLogin = Boolean(req.body.newPassword || previous?.username !== account.username);
     if (requiresLogin) deleteAccountSessions(db, account.id);
     res.json({ account, requiresLogin });
+  });
+
+  router.get('/user-settings', (req, res) => res.json({
+    registrationEnabled: config.userRegistration !== false,
+    emailConfigured: Boolean(emailService?.configured),
+    sessionDays: 30,
+    verificationHours: 24,
+    resetHours: 1
+  }));
+  router.put('/user-settings', (req, res) => {
+    const enabled = req.body.registrationEnabled !== false;
+    config.userRegistration = enabled;
+    setSetting(db, 'user_registration_enabled', enabled ? '1' : '0');
+    res.json({ registrationEnabled: enabled, emailConfigured: Boolean(emailService?.configured), sessionDays: 30, verificationHours: 24, resetHours: 1 });
+  });
+
+  router.get('/users', (req, res) => {
+    res.json(listUsers(db).map((user) => ({
+      ...serializeUser(user),
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      failedLoginCount: Number(user.failed_login_count || 0),
+      lockedUntil: user.locked_until || null,
+      responseCount: Number(user.response_count || 0),
+      activeSessionCount: Number(user.active_session_count || 0)
+    })));
+  });
+
+  router.put('/users/:id/status', (req, res) => {
+    const user = setUserStatus(db, req.params.id, req.body.status);
+    if (req.body.status === 'disabled') {
+      deleteUserSessions(db, user.id);
+    }
+    res.json({ user: serializeUser(user) });
+  });
+
+  router.post('/users/:id/revoke-sessions', (req, res) => {
+    const user = getUserById(db, req.params.id);
+    if (!user) throw new HttpError(404, '用户不存在');
+    const result = deleteUserSessions(db, user.id);
+    res.json({ revoked: result.changes || 0 });
+  });
+
+  router.delete('/users/:id', (req, res) => {
+    deleteUserAndAnonymize(db, req.params.id);
+    res.status(204).end();
   });
 
   router.get('/update', asyncRoute(async (req, res) => {
@@ -143,16 +192,24 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
   });
 
   router.post('/surveys', (req, res) => {
-    res.status(201).json(surveyService.createSurvey(req.body));
+    const survey = surveyService.createSurvey(req.body);
+    const policy = accessPolicy.savePolicy(survey.id, req.body.accessPolicy || {});
+    res.status(201).json({ ...survey, accessPolicy: policy });
   });
 
   router.get('/surveys/:id', (req, res) => {
-    res.json(surveyService.getSurvey(req.params.id, true, true));
+    const survey = surveyService.getSurvey(req.params.id, true, true);
+    res.json({ ...survey, accessPolicy: accessPolicy.getPolicy(survey.id) });
   });
 
   router.put('/surveys/:id', (req, res) => {
-    res.json(surveyService.updateSurvey(req.params.id, req.body));
+    const survey = surveyService.updateSurvey(req.params.id, req.body);
+    if (req.body.accessPolicy) accessPolicy.savePolicy(survey.id, req.body.accessPolicy);
+    res.json({ ...survey, accessPolicy: accessPolicy.getPolicy(survey.id) });
   });
+
+  router.get('/surveys/:id/access', (req, res) => res.json(accessPolicy.getPolicy(req.params.id)));
+  router.put('/surveys/:id/access', (req, res) => res.json(accessPolicy.savePolicy(req.params.id, req.body)));
 
   router.delete('/surveys/:id', (req, res) => {
     const result = db.prepare('DELETE FROM surveys WHERE id = ?').run(req.params.id);
@@ -162,7 +219,8 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
 
   router.get('/surveys/:id/export', (req, res) => {
     const survey = surveyService.getSurvey(req.params.id, true, true);
-    const responseRows = db.prepare('SELECT * FROM responses WHERE survey_id = ? ORDER BY submitted_at ASC').all(req.params.id);
+    const includePersonalInfo = ['1', 'true', 'yes'].includes(String(req.query.includePersonalInfo || '').toLowerCase());
+    const responseRows = db.prepare('SELECT r.*, u.display_name, u.email FROM responses r LEFT JOIN users u ON u.id=r.user_id WHERE r.survey_id = ? ORDER BY r.submitted_at ASC').all(req.params.id);
     const answersByResponse = db.prepare('SELECT survey_question_id, value_json FROM answers WHERE response_id = ?');
     const exportQuestions = db.prepare(`
       SELECT q.* FROM survey_questions q
@@ -187,6 +245,10 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
       ]));
       return {
         submittedAt: response.submitted_at,
+        participant: response.display_name ? {
+          displayName: response.display_name,
+          ...(includePersonalInfo ? { email: response.email } : {})
+        } : null,
         answers,
         score: response.score === null ? null : Number(response.score),
         maxScore: response.max_score === null ? null : Number(response.max_score)
@@ -204,9 +266,11 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="survey-${survey.id}.csv"`);
     // UTF-8 BOM 让 Excel 正确识别中文。
-    const header = ['提交时间', ...questions.map((q) => q.title), ...(includeScores ? ['得分', '满分'] : [])];
+    const header = ['提交时间', '提交者', ...(includePersonalInfo ? ['邮箱'] : []), ...questions.map((q) => q.title), ...(includeScores ? ['得分', '满分'] : [])];
     const lines = [header, ...rows.map((row) => [
       row.submittedAt,
+      row.participant?.displayName || '匿名',
+      ...(includePersonalInfo ? [row.participant?.email || ''] : []),
       ...questions.map((q) => {
         const value = row.answers[q.id];
         return Array.isArray(value) ? value.join('、') : (value === null || value === undefined ? '' : String(value));
@@ -232,7 +296,7 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
       ...serializeQuestion(question, { includeAnswer: true }),
       archived: !question.is_active
     }));
-    const responseRows = db.prepare('SELECT * FROM responses WHERE survey_id = ? ORDER BY submitted_at DESC').all(req.params.id);
+    const responseRows = db.prepare('SELECT r.*, u.display_name, u.email FROM responses r LEFT JOIN users u ON u.id=r.user_id WHERE r.survey_id = ? ORDER BY r.submitted_at DESC').all(req.params.id);
     const answersByResponse = db.prepare(`
       SELECT a.survey_question_id, a.value_json, a.is_correct, a.awarded_score
       FROM answers a WHERE a.response_id = ?
@@ -240,6 +304,7 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
     const responses = responseRows.map((response) => ({
       id: response.id,
       submittedAt: response.submitted_at,
+      participant: response.display_name ? { displayName: response.display_name, email: maskEmail(response.email) } : null,
       score: response.score === null ? null : Number(response.score),
       maxScore: response.max_score === null ? null : Number(response.max_score),
       answers: Object.fromEntries(answersByResponse.all(response.id).map((answer) => [
@@ -258,3 +323,10 @@ function createAdminApi({ db, surveyService, config, app, updateService }) {
 }
 
 module.exports = { createAdminApi };
+
+function maskEmail(email) {
+  const value = String(email || '');
+  const [name, domain] = value.split('@');
+  if (!name || !domain) return '';
+  return `${name.length <= 2 ? `${name[0] || ''}*` : `${name.slice(0, 2)}***`}@${domain}`;
+}

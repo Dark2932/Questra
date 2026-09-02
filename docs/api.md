@@ -47,6 +47,25 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 
 提交成功返回 `id`、`message`、`kind`、`score` 和 `maxScore`。服务器会重新校验题目 ID、必填项、选项和文本长度；考试分数由服务器计算。
 
+## 普通用户接口
+
+普通用户使用独立的 `questra_user_session` HttpOnly Cookie，与管理员会话和 Admin Token 不互通。注册、登录、验证和密码重置的写请求要求同源，并受独立限流保护。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `POST` | `/api/user/auth/register` | 注册并发送验证邮件 |
+| `POST` | `/api/user/auth/verify` | 消费邮箱验证 Token |
+| `POST` | `/api/user/auth/resend-verification` | 重发验证邮件 |
+| `POST` | `/api/user/auth/login` | 邮箱密码登录 |
+| `GET` | `/api/user/auth/me` | 获取当前普通用户 |
+| `POST` | `/api/user/auth/logout` | 注销普通用户会话 |
+| `POST` | `/api/user/auth/forgot-password` | 请求重置密码邮件 |
+| `POST` | `/api/user/auth/reset-password` | 使用 Token 设置密码 |
+| `PUT` | `/api/user/profile` | 修改显示名称 |
+| `PUT` | `/api/user/password` | 修改当前密码 |
+
+注册、重发和找回密码接口使用不暴露账户是否存在的统一响应。未验证用户可以登录，但访问 `verified_email` 问卷时返回 `403`。
+
 ## 管理接口
 
 所有 `/api/admin/*` 接口都需要管理认证。
@@ -72,9 +91,17 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `POST` | `/api/admin/surveys` | 从题库生成问卷或考试 |
 | `GET` | `/api/admin/surveys/:id` | 查看实例和题目快照 |
 | `PUT` | `/api/admin/surveys/:id` | 修改实例类型、基本信息、题目和计分结构 |
+| `GET` | `/api/admin/surveys/:id/access` | 查看问卷访问与限制策略 |
+| `PUT` | `/api/admin/surveys/:id/access` | 修改问卷访问与限制策略 |
+| `GET` | `/api/admin/user-settings` | 查看普通用户注册和邮件配置状态 |
+| `PUT` | `/api/admin/user-settings` | 开关普通用户注册 |
+| `GET` | `/api/admin/users` | 查询普通用户（仅管理员） |
+| `PUT` | `/api/admin/users/:id/status` | 启用或禁用用户 |
+| `POST` | `/api/admin/users/:id/revoke-sessions` | 撤销用户全部会话 |
+| `DELETE` | `/api/admin/users/:id` | 删除用户并匿名化历史答卷 |
 | `DELETE` | `/api/admin/surveys/:id` | 删除实例及其答卷 |
 | `GET` | `/api/admin/surveys/:id/responses` | 查看答卷与逐题判分 |
-| `GET` | `/api/admin/surveys/:id/export` | 导出 CSV 或 JSON |
+| `GET` | `/api/admin/surveys/:id/export` | 导出 CSV 或 JSON；`includePersonalInfo=1` 时显式包含完整邮箱，默认不包含 |
 
 更新状态接口返回 `installationType`（`source` 或 `global`）、`sourceBuild` 和 `updateSupported`，用于在联网前识别源码构建版。源码构建版不会访问 GitHub，检测和安装操作均被禁用，并提供源码仓库入口。
 
@@ -130,6 +157,19 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 考试中的每道题必须已有标准答案。`scoringMode` 为 `weighted` 时权重总和必须为 100；为 `per_question` 时传入 `questionScores` 对象。实例生成后题目和计分配置会保存为快照。
 
 编辑实例可提交与创建时相同的结构字段，并可额外提交 `status`。即使实例已有答卷，也可以更换题目、选题方式、实例类型和计分配置；新结构用于后续提交，已有答卷引用的旧题目快照和提交时分数继续保留。答卷接口中的历史题目带有 `archived: true`。当 `expiresAt` 不为空且已到期时，服务端始终将 `status` 保存为 `closed`；只有同一次请求把截止时间改到未来，`status: active` 才会生效。
+
+创建或编辑实例时可以提交 `accessPolicy`：
+
+```json
+{
+  "accessMode": "verified_email",
+  "maxSubmissionsPerUser": 1,
+  "maxSubmissionsTotal": 500,
+  "cooldownSeconds": 60
+}
+```
+
+`accessMode` 可为 `anonymous`、`account` 或 `verified_email`。匿名模式不能设置按用户限制；次数、总量和冷却限制由服务端在写入答卷的 SQLite 事务内检查。
 
 ## 答卷和导出
 

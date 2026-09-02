@@ -6,17 +6,26 @@ import { useTheme } from './hooks/useTheme';
 import { api } from './api';
 import { DEFAULT_SITE_ICON_URL } from './lib/siteIcon';
 import { formatPageTitle, pageNameForPath } from './lib/pageTitle';
+import { UserAuthProvider } from './hooks/useUserAuth';
 
 const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
 const Questions = lazy(() => import('./pages/admin/Questions'));
 const Surveys = lazy(() => import('./pages/admin/Surveys'));
 const Responses = lazy(() => import('./pages/admin/Responses'));
+const Users = lazy(() => import('./pages/admin/Users'));
+const Plugins = lazy(() => import('./pages/admin/Plugins'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const SetupWizard = lazy(() => import('./pages/SetupWizard'));
 const Login = lazy(() => import('./pages/Login'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const Survey = lazy(() => import('./pages/Survey'));
+const UserLogin = lazy(() => import('./pages/UserLogin'));
+const UserRegister = lazy(() => import('./pages/UserRegister'));
+const UserVerify = lazy(() => import('./pages/UserVerify'));
+const UserForgotPassword = lazy(() => import('./pages/UserForgotPassword'));
+const UserResetPassword = lazy(() => import('./pages/UserResetPassword'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
 
 function useAdminAccess() {
   const [token, setToken] = useState(() => {
@@ -85,9 +94,17 @@ function AnimatedRoutes({ access, theme, resolvedTheme, setTheme }) {
       <Route path="questions" element={<Questions />} />
       <Route path="surveys" element={<Surveys />} />
       <Route path="surveys/:id/responses" element={<Responses />} />
+      <Route path="users" element={<Users />} />
+      <Route path="plugins" element={<Plugins />} />
       <Route path="settings" element={<Settings onLogout={access.logout} onRefresh={access.refresh} resolvedTheme={resolvedTheme} />} />
     </Route>
     <Route path="/s/:id" element={<Survey siteName={access.setup?.siteName} />} />
+    <Route path="/user/login" element={<UserLogin />} />
+    <Route path="/user/register" element={<UserRegister />} />
+    <Route path="/user/verify" element={<UserVerify />} />
+    <Route path="/user/forgot-password" element={<UserForgotPassword />} />
+    <Route path="/user/reset-password" element={<UserResetPassword />} />
+    <Route path="/user/profile" element={<UserProfile />} />
     <Route path="/unauthorized" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Unauthorized siteName={access.setup?.siteName} siteInitial={access.setup?.siteInitial} siteInitialColor={access.setup?.siteInitialColor} siteIcon={access.setup?.siteIcon} siteIconAsInitial={access.setup?.siteIconAsInitial} />} />
     <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>
@@ -128,5 +145,5 @@ export default function App() {
     link.href = icon;
   }, [access.setup?.siteIcon]);
 
-  return <ConfigProvider theme={themeConfig} locale={zhCN}><AntApp><BrowserRouter><AnimatedRoutes access={access} theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} /></BrowserRouter></AntApp></ConfigProvider>;
+  return <ConfigProvider theme={themeConfig} locale={zhCN}><AntApp><BrowserRouter><UserAuthProvider><AnimatedRoutes access={access} theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} /></UserAuthProvider></BrowserRouter></AntApp></ConfigProvider>;
 }

@@ -34,6 +34,7 @@ yarn.lock
 /build/
 /coverage/
 /.nyc_output/
+/docs/proposal/
 *.tsbuildinfo
 
 # Logs and temporary files
@@ -59,4 +60,3 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 Desktop.ini
-

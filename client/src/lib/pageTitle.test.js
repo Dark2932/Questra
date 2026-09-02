@@ -6,6 +6,7 @@ describe('page titles', () => {
     expect(pageNameForPath('/admin')).toBe('仪表盘');
     expect(pageNameForPath('/admin/questions')).toBe('题库');
     expect(pageNameForPath('/admin/surveys/123/responses')).toBe('回收数据');
+    expect(pageNameForPath('/admin/plugins')).toBe('插件');
     expect(pageNameForPath('/admin/login')).toBe('管理员登录');
     expect(pageNameForPath('/unauthorized')).toBe('管理员登录');
   });

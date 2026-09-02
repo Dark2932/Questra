@@ -12,15 +12,19 @@ const { securityHeaders } = require('./middleware/security');
 const { createRateLimit } = require('./middleware/rate-limit');
 const { createAdminAccount, getAdminAccount, serializeAccount, verifyPassword } = require('./admin-account');
 const { createSession, deleteSession } = require('./admin-session');
-const { DEFAULT_SITE_ICON_URL, getSiteSettings, updateSiteSettings } = require('./settings');
+const { DEFAULT_SITE_ICON_URL, getSiteSettings, updateSiteSettings, getSetting } = require('./settings');
 const { createUpdateService } = require('./update-service');
+const { createAccessPolicyService } = require('./services/access-policy');
+const { createEmailService } = require('./services/email-service');
+const { createUserAuthRoutes } = require('./routes/user-auth');
+const { getUserAuth } = require('./middleware/user-auth');
 
 function setSessionCookie(res, token, secure = false) {
   const secureFlag = secure ? '; Secure' : '';
   res.setHeader('Set-Cookie', `questra_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Max-Age=604800; SameSite=Lax${secureFlag}`);
 }
 
-function createApp({ db, config, adminToken, updateService = createUpdateService() }) {
+function createApp({ db, config, adminToken, updateService = createUpdateService(), emailService = null }) {
   const app = express();
   const siteSettings = getSiteSettings(db, config.siteName || 'Questra');
   config.siteName = siteSettings.siteName;
@@ -29,7 +33,11 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
   config.siteInitial = siteSettings.siteInitial;
   config.siteInitialColor = siteSettings.siteInitialColor;
   config.themeColor = siteSettings.themeColor;
+  const persistedRegistration = getSetting(db, 'user_registration_enabled', null);
+  if (persistedRegistration !== null) config.userRegistration = persistedRegistration !== '0';
   const surveyService = createSurveyService(db);
+  const accessPolicy = createAccessPolicyService(db);
+  const userMailer = emailService || createEmailService(config);
   const adminAuth = createAdminAuth(adminToken, db);
   const distPath = path.join(__dirname, '..', 'client', 'dist');
   const spaAvailable = fs.existsSync(path.join(distPath, 'index.html'));
@@ -37,6 +45,8 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
   const submitLimiter = createRateLimit({ windowMs: 60_000, max: 30 });
   const adminWriteLimiter = createRateLimit({ windowMs: 60_000, max: 60 });
   const loginLimiter = createRateLimit({ windowMs: 60_000, max: 10 });
+  const userRegistrationLimiter = createRateLimit({ windowMs: 60_000, max: 5 });
+  const userAuthLimiter = createRateLimit({ windowMs: 60_000, max: 10 });
 
   app.disable('x-powered-by');
   app.set('view engine', 'ejs');
@@ -65,6 +75,8 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: false, limit: '2mb' }));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
+
+  app.use(createUserAuthRoutes({ db, config, emailService: userMailer, registrationLimiter: userRegistrationLimiter, authLimiter: userAuthLimiter }));
 
   app.get('/api/config', (req, res) => res.json({ siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor }));
 
@@ -142,8 +154,8 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
   });
 
   app.get('/', (req, res) => res.redirect('/admin'));
-  app.use(createPublicRoutes({ db, config, surveyService, submitLimiter }));
-  app.use('/api/admin', adminWriteLimiter, adminAuth, createAdminApi({ db, surveyService, config, app, updateService }));
+  app.use(createPublicRoutes({ db, config, surveyService, submitLimiter, accessPolicy, userAuth: (req) => getUserAuth(req, db) }));
+  app.use('/api/admin', adminWriteLimiter, adminAuth, createAdminApi({ db, surveyService, config, app, updateService, accessPolicy, emailService: userMailer }));
 
   if (spaAvailable) {
     app.use('/assets', express.static(path.join(distPath, 'assets'), { maxAge: '1h', immutable: true }));
@@ -156,11 +168,26 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
     app.get('/s/:id', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+    app.get('/user/{*path}', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+    app.get('/user', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   } else {
     app.get('/s/:id', (req, res) => {
       const survey = surveyService.getSurvey(req.params.id);
+      const auth = getUserAuth(req, db);
+      const policy = accessPolicy.getPolicy(survey.id);
+      const viewer = accessPolicy.viewerState(policy, auth?.user || null);
       surveyService.ensureSurveyOpen(survey);
-      res.render('survey', { survey, siteName: config.siteName, siteIcon: config.siteIcon, siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor });
+      const accessDenied = !viewer.authorized && policy.requireLoginToView;
+      res.render('survey', { survey: accessDenied ? { ...survey, questions: [] } : survey, accessDenied, accessPolicy: policy, viewer, siteName: config.siteName, siteIcon: config.siteIcon, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor });
+    });
+    app.get('/user/:page?', (req, res) => {
+      const pages = { login: '用户登录', register: '注册账户', verify: '邮箱验证', 'forgot-password': '重置密码', 'reset-password': '设置新密码', profile: '账户资料' };
+      const page = pages[req.params.page] ? req.params.page : 'login';
+      res.render('user-auth', { page, pageTitle: pages[page], siteName: config.siteName, siteIcon: config.siteIcon, themeColor: config.themeColor });
     });
     app.use('/admin', adminAuth, createAdminPages({ db, config, surveyService }));
   }

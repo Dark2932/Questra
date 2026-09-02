@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMemo } from 'react';
 import { Typography, Result, Spin, Statistic, Card, Space, Divider, Button, ConfigProvider, Segmented, Tooltip, theme as antTheme } from 'antd';
 import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, ReloadOutlined, SettingOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';
@@ -74,6 +74,18 @@ export default function Survey({ siteName }) {
   if (loading) return (<ConfigProvider theme={surveyTheme}><div style={containerStyle}><Spin size="large" /></div></ConfigProvider>);
   if (error) return (<ConfigProvider theme={surveyTheme}><div style={containerStyle}><Result status="warning" title="无法加载问卷" subTitle={error}
     extra={<Button icon={<ReloadOutlined />} onClick={() => window.location.reload()}>重试</Button>} /></div></ConfigProvider>);
+
+  const accessDenied = survey && !survey.questions;
+  if (accessDenied) {
+    const returnTo = `/s/${id}`;
+    const loginUrl = `/user/login?returnTo=${encodeURIComponent(returnTo)}`;
+    const registerUrl = `/user/register?returnTo=${encodeURIComponent(returnTo)}`;
+    return <ConfigProvider theme={surveyTheme}><div style={containerStyle}><Card bordered={false} style={{ maxWidth: 640, width: '100%', textAlign: 'center' }}>
+      <Result status={survey.viewer?.authenticated ? 'warning' : 'info'} title={survey.accessPolicy?.requiresVerifiedEmail && survey.viewer?.authenticated ? '请先验证邮箱' : '请登录后填写'}
+        subTitle={survey.accessPolicy?.requiresVerifiedEmail ? '该问卷要求使用已验证邮箱的账户。' : '该问卷需要登录 Questra 用户账户后才能填写。'}
+        extra={<Space><Link to={loginUrl}><Button type="primary">登录</Button></Link><Link to={registerUrl}><Button>注册账户</Button></Link></Space>} />
+    </Card></div></ConfigProvider>;
+  }
 
   return (
     <ConfigProvider theme={surveyTheme}><div style={containerStyle}>

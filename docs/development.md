@@ -6,6 +6,8 @@
 
 Questra 是一个单进程 Node.js 应用：Express 装配 HTTP 路由和安全中间件，better-sqlite3 以 WAL 模式访问 SQLite，生产前端由同一进程托管。没有 `client/dist` 时，服务回退到 `views/` 中的兼容 EJS 页面。
 
+普通用户认证与管理员认证分属两个身份域。`src/user-account.js`、`src/user-session.js` 和 `src/middleware/user-auth.js` 管理普通用户；`src/services/auth-token-service.js` 管理邮箱验证/重置 Token；`src/services/email-service.js` 封装 SMTP。问卷的 `src/services/access-policy.js` 负责访问方式和参与限制，提交时由 `survey-service` 在同一 SQLite 事务内复核。管理端用户生命周期接口位于 `src/routes/admin-api.js`，删除用户前会把历史答卷的 `user_id` 置空。
+
 一次公开提交的主要流程是：读取问卷快照 -> 校验答案 -> 调用 `beforeSubmit` -> 在事务中写入答卷并判分 -> 调用 `afterSubmit` -> 返回结果。`beforeSubmit` 失败会阻止写入；`afterSubmit` 失败只记录日志，不回滚已经保存的数据。
 
 题库与问卷实例通过快照解耦；分组通过关联表管理；迁移文件按名称排序并记录在 `schema_migrations` 中。单机 SQLite 是当前部署边界，多节点不能同时写同一数据库文件。
@@ -43,7 +45,7 @@ src/services/           题目、快照、选题、校验和判分规则
 src/db.js               SQLite 连接和迁移执行器
 src/middleware/         认证、限流和安全响应头
 src/*.js                配置、账户、会话、Token 和设置
-client/src/             React 管理端、向导和填写端
+client/src/             React 管理端、用户认证/资料页、向导和填写端
 migrations/             只增不改的数据库迁移
 views/、public/         无 React 构建时的兼容界面与静态资源
 ```
@@ -82,9 +84,11 @@ module.exports = {
 
 当前核心表包括 `question_pool`、`question_groups`、`question_group_items`、`surveys`、`survey_questions`、`responses` 和 `answers`，管理员认证使用 `admin_accounts`、`admin_sessions`、`app_settings`。`survey_questions.is_active` 区分当前题目结构与仍被历史答卷引用的旧快照；结构编辑不得删除历史答卷。已有迁移不能修改；新增结构使用下一个编号，并同时覆盖空库和已有库升级测试。考虑 WAL、外键级联、备份恢复和历史快照兼容。
 
+迁移 `006_user_auth_and_access.sql` 新增 `users`、`user_sessions`、`user_auth_tokens`、`survey_access_policies`，并为 `responses` 增加可空 `user_id`。新资源若复用参与限制，应先调用 `access-policy` 服务并保持授权检查与资源写入处于同一事务；不能信任客户端传入的用户 ID、邮箱或剩余次数。
+
 ## API 开发
 
-完整端点、认证、数据结构和示例集中在 [HTTP API](api.md)。公开接口不得泄露标准答案或管理数据；管理写接口、登录和公开提交均有进程内限流。变更接口时应更新客户端 `client/src/api.js`、后端校验、测试和 API 文档，并明确错误状态和兼容行为。命令行参数和环境变量不在 API 文档中重复，统一维护在[命令参考](commands.md)和[安装与部署](installation.md)。
+完整端点、认证、数据结构和示例集中在 [HTTP API](api.md)。公开接口不得泄露标准答案或管理数据；管理写接口、登录和公开提交均有进程内限流。变更接口时应更新客户端 `client/src/api.js`、后端校验、测试和 API 文档，并明确错误状态和兼容行为。普通用户前端通过 `useUserAuth` 独立维护状态，问卷草稿保存在会话存储，不能把用户身份或 Token 放入提交体。命令行参数和环境变量不在 API 文档中重复，统一维护在[命令参考](commands.md)和[安装与部署](installation.md)。
 
 ## 测试和发布
 

@@ -92,6 +92,43 @@ pnpm run start
 
 ## 配置和数据目录
 
+### 基本配置
+
+可在 `survey.config.js` 中长期设置端口、地址、站点名称、日志和钩子：
+
+```js
+port: 3000,
+host: '0.0.0.0',
+database: './data/questra.db',
+siteName: '团队反馈中心',
+logging: true,
+hooks: {...}
+```
+
+端口和地址的优先级是命令行参数 > 环境变量 > 配置文件 > 默认值。常用环境变量还包括 `QUESTRA_ADMIN_TOKEN`、`QUESTRA_RUNTIME_FILE` 和 `QUESTRA_LOG_FILE`。Token 优先使用环境变量，其次读取数据目录的 `.admin-token`，最后才自动生成。
+
+### 普通用户邮件服务
+
+普通用户注册、邮箱验证和密码重置需要 SMTP。匿名问卷和管理员登录不依赖邮件服务。复制 `survey.config.example.js` 中的 `publicUrl` 和 `email` 配置到自己的 `survey.config.js`，密码建议通过 `QUESTRA_SMTP_PASSWORD` 等环境变量注入：
+
+```js
+publicUrl: 'https://survey.example.com',
+userRegistration: true,
+email: {
+  enabled: true,
+  host: 'smtp.example.com',
+  port: 587,
+  secure: false,
+  user: 'noreply@example.com',
+  password: process.env.QUESTRA_SMTP_PASSWORD,
+  from: 'Questra <noreply@example.com>'
+}
+```
+
+生产环境必须使用 HTTPS，并确保 `publicUrl` 是用户实际访问的站点地址。后台“用户与认证”可以关闭新用户注册，但不会注销已有用户；未配置 SMTP 时，注册和密码重置接口会被禁用。
+
+### 数据目录
+
 Questra 从启动命令所在目录读取可选的 `survey.config.js`，但相对数据库路径以 Questra 安装根目录为基准。默认文件为安装根目录下的 `data/questra.db` 和 `.admin-token`。生产环境应设置 `QUESTRA_DATA_DIR`，使数据不随 npm 包升级或卸载：
 
 PowerShell：
@@ -107,23 +144,6 @@ Bash/Zsh：
 export QUESTRA_DATA_DIR='/var/lib/questra'
 questra start
 ```
-
-可在 `survey.config.js` 中长期设置端口、地址、站点名称、日志和钩子：
-
-```js
-'use strict';
-
-module.exports = {
-  port: 3000,
-  host: '0.0.0.0',
-  database: './data/questra.db',
-  siteName: '团队反馈中心',
-  logging: true,
-  hooks: {}
-};
-```
-
-端口和地址的优先级是命令行参数 > 环境变量 > 配置文件 > 默认值。常用环境变量还包括 `QUESTRA_ADMIN_TOKEN`、`QUESTRA_RUNTIME_FILE` 和 `QUESTRA_LOG_FILE`。Token 优先使用环境变量，其次读取数据目录的 `.admin-token`，最后才自动生成。
 
 ## 生命周期命令
 

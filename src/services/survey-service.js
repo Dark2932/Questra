@@ -283,20 +283,22 @@ function createSurveyService(db) {
     });
   }
 
-  function saveResponse(survey, validatedAnswers) {
+  function saveResponse(survey, validatedAnswers, { user = null, accessPolicy = null } = {}) {
     const responseId = randomUUID();
     const gradedAnswers = validatedAnswers.map((answer) => gradeAnswer(survey.kind, answer));
     const score = survey.kind === 'exam'
       ? roundScore(gradedAnswers.reduce((sum, answer) => sum + answer.awardedScore, 0))
       : null;
-    const insertResponse = db.prepare('INSERT INTO responses (id, survey_id, score, max_score) VALUES (?, ?, ?, ?)');
+    const insertResponse = db.prepare('INSERT INTO responses (id, survey_id, score, max_score, user_id) VALUES (?, ?, ?, ?, ?)');
     const insertAnswer = db.prepare(`
       INSERT INTO answers
         (response_id, survey_question_id, value_json, is_correct, awarded_score)
       VALUES (?, ?, ?, ?, ?)
     `);
     db.transaction(() => {
-      insertResponse.run(responseId, survey.id, score, survey.maxScore);
+      // 在写入答卷的同一事务内再次检查访问策略，避免并发请求绕过次数限制。
+      if (accessPolicy) accessPolicy.authorize(accessPolicy.getPolicy(survey.id), user, { action: 'submit' });
+      insertResponse.run(responseId, survey.id, score, survey.maxScore, user?.id || null);
       for (const answer of gradedAnswers) {
         insertAnswer.run(
           responseId,
