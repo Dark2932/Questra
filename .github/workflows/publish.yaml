@@ -34,8 +34,6 @@ jobs:
           # 人工 Release 使用其标签所指向的源码，页面无需预先上传任何附件。
           ref: ${{ inputs.tag || github.event.release.tag_name }}
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
