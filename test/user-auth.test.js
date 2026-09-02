@@ -9,6 +9,29 @@ const test = require('node:test');
 const { openDatabase, migrate } = require('../src/db');
 const { createApp } = require('../src/app');
 
+test('无前端构建产物时提供用户认证回退页面', async (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-user-fallback-'));
+  const db = openDatabase(path.join(tempDir, 'test.db'));
+  migrate(db);
+  const app = createApp({
+    db,
+    adminToken: 'admin-token',
+    config: { siteName: 'Fallback Test', hooks: {} },
+    clientBundleAvailable: false
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => { server.close(); db.close(); fs.rmSync(tempDir, { recursive: true, force: true }); });
+
+  for (const route of ['/user', '/user/login']) {
+    const response = await fetch(`${baseUrl}${route}`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /text\/html/);
+    assert.match(await response.text(), /用户登录/);
+  }
+});
+
 test('普通用户注册、邮箱验证和问卷填写次数限制', async (t) => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-user-'));
   const db = openDatabase(path.join(tempDir, 'test.db'));

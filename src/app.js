@@ -24,7 +24,7 @@ function setSessionCookie(res, token, secure = false) {
   res.setHeader('Set-Cookie', `questra_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Max-Age=604800; SameSite=Lax${secureFlag}`);
 }
 
-function createApp({ db, config, adminToken, updateService = createUpdateService(), emailService = null }) {
+function createApp({ db, config, adminToken, updateService = createUpdateService(), emailService = null, clientBundleAvailable = null }) {
   const app = express();
   const siteSettings = getSiteSettings(db, config.siteName || 'Questra');
   config.siteName = siteSettings.siteName;
@@ -40,7 +40,7 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
   const userMailer = emailService || createEmailService(config);
   const adminAuth = createAdminAuth(adminToken, db);
   const distPath = path.join(__dirname, '..', 'client', 'dist');
-  const spaAvailable = fs.existsSync(path.join(distPath, 'index.html'));
+  const spaAvailable = clientBundleAvailable ?? fs.existsSync(path.join(distPath, 'index.html'));
   // 个人服务器场景：提交接口和写操作按 IP 限流，防止脚本灌入。
   const submitLimiter = createRateLimit({ windowMs: 60_000, max: 30 });
   const adminWriteLimiter = createRateLimit({ windowMs: 60_000, max: 60 });
@@ -184,7 +184,7 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
       const accessDenied = !viewer.authorized && policy.requireLoginToView;
       res.render('survey', { survey: accessDenied ? { ...survey, questions: [] } : survey, accessDenied, accessPolicy: policy, viewer, siteName: config.siteName, siteIcon: config.siteIcon, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor });
     });
-    app.get('/user/:page?', (req, res) => {
+    app.get(['/user', '/user/:page'], (req, res) => {
       const pages = { login: '用户登录', register: '注册账户', verify: '邮箱验证', 'forgot-password': '重置密码', 'reset-password': '设置新密码', profile: '账户资料' };
       const page = pages[req.params.page] ? req.params.page : 'login';
       res.render('user-auth', { page, pageTitle: pages[page], siteName: config.siteName, siteIcon: config.siteIcon, themeColor: config.themeColor });
