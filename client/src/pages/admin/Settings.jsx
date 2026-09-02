@@ -151,7 +151,7 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
     if (!updateInfo?.updateAvailable) return;
     modal.confirm({
       title: `确认安装 Questra ${updateInfo.latestVersion}？`,
-      content: '服务器将使用 npm 全局安装该版本。安装期间请勿关闭 Questra，完成后需要重启服务才能运行新版本。',
+      content: '服务器会在当前请求完成后暂时关闭 Questra，使用 npm 全局安装该版本，再按原启动参数自动恢复服务。安装期间页面会短暂无法访问。',
       okText: '确认安装',
       cancelText: '取消',
       onOk: async () => {
@@ -160,7 +160,7 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
           const result = await api.installUpdate();
           setUpdateInfo(result);
           setInstallResult(result);
-          message.success(`Questra ${result.installedVersion} 已安装，请重启服务`);
+          message.success(`Questra ${result.installedVersion} 更新任务已开始，服务将自动重启`);
         } catch (error) {
           message.error(error.message);
           throw error;
@@ -245,8 +245,8 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
           </Space>}
         />}
         {updateInfo?.releaseNotes && <div><Text strong>最新正式版说明</Text><Paragraph className="update-release-notes">{updateInfo.releaseNotes}</Paragraph></div>}
-        {installResult && <Alert type="success" showIcon message={`Questra ${installResult.installedVersion} 安装完成`} description="请重启 Questra 服务。重启前，当前进程仍然运行旧版本。" />}
-        {installResult?.output && <details className="update-install-output"><summary>查看 npm 输出</summary><pre>{installResult.output}</pre></details>}
+        {installResult && <Alert type="info" showIcon message={`Questra ${installResult.installedVersion} 更新任务已排队`} description="服务将短暂关闭，并在 npm 安装结束后自动按原参数启动。稍后重新打开此页面即可确认版本。" />}
+        {installResult?.output && <details className="update-install-output"><summary>查看任务信息</summary><pre>{installResult.output}</pre></details>}
         <Space wrap>
           <Button type="primary" icon={<ReloadOutlined />} loading={updateChecking} disabled={updateInstalling || updateBlocked || !updateInfo} onClick={checkForUpdate}>检测更新</Button>
           <Button icon={<CloudDownloadOutlined />} loading={updateInstalling} disabled={!updateInfo?.updateAvailable || !updateInfo?.updateSupported || updateChecking} onClick={confirmInstallUpdate}>安装新版本</Button>

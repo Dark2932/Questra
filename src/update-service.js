@@ -1,10 +1,10 @@
 'use strict';
 
 const { execFile } = require('node:child_process');
-const fs = require('node:fs');
 const path = require('node:path');
 const packageJson = require('../package.json');
 const { HttpError } = require('./lib/http');
+const { detectInstallationType } = require('./installation');
 
 const RELEASES_URL = 'https://api.github.com/repos/Dark2932/Questra/releases';
 const LATEST_RELEASE_URL = `${RELEASES_URL}?per_page=100&page=1`;
@@ -34,16 +34,6 @@ function compareVersions(left, right) {
     if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
   }
   return 0;
-}
-
-/**
- * 发布包不会包含这些源码开发文件；通过源码运行时至少会存在其中一项。
- * 这让更新页无需联网即可先禁用不适用于源码构建的操作。
- */
-function detectInstallationType(installationDirectory = path.resolve(__dirname, '..')) {
-  const root = path.resolve(installationDirectory);
-  const sourceMarkers = ['.git', 'pnpm-lock.yaml', 'client/src', 'scripts'];
-  return sourceMarkers.some((marker) => fs.existsSync(path.join(root, marker))) ? 'source' : 'global';
 }
 
 function createNpmInstaller({
@@ -182,19 +172,25 @@ function createUpdateService({
     if (!status.updateSupported) throw exposedError(409, status.sourceBuild ? '源码构建版不支持在线更新，请前往 Questra 源码仓库获取最新版代码' : '当前版本不属于 GitHub Releases 正式版本，请重新安装最新正式版');
     if (installing) throw exposedError(409, '已有更新安装任务正在进行');
     installing = true;
+    let updateQueued = false;
     try {
       const release = await checkForUpdate();
       if (!release.compliantVersion) throw exposedError(409, '当前版本不属于 GitHub Releases 正式版本，请重新安装最新正式版');
       if (!release.updateAvailable) throw exposedError(409, '当前已经是最新版本，无需安装');
-      const output = await installPackage(release.latestVersion);
+      const installation = await installPackage(release.latestVersion);
+      const installationResult = installation && typeof installation === 'object'
+        ? installation
+        : { output: installation };
+      updateQueued = Boolean(installationResult.updateQueued);
       return {
         ...release,
         installedVersion: release.latestVersion,
-        restartRequired: true,
-        output
+        restartRequired: installationResult.restartRequired !== false,
+        updateQueued,
+        output: installationResult.output || ''
       };
     } finally {
-      installing = false;
+      if (!updateQueued) installing = false;
     }
   }
 

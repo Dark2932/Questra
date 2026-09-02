@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { loadConfig, installationDirectory } = require('../src/config');
+const { defaultDataDirectory, loadConfig, installationDirectory } = require('../src/config');
 
 function withoutDataDirectory(action) {
   const previous = process.env.QUESTRA_DATA_DIR;
@@ -29,6 +29,12 @@ test('默认数据库路径绑定安装目录而不是执行目录', () => {
     process.chdir(originalCwd);
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test('全局安装的默认数据目录位于安装目录之外', () => {
+  const directory = defaultDataDirectory('global');
+  assert.equal(directory, path.join(os.homedir(), '.questra', 'data'));
+  assert.notEqual(directory, path.join(installationDirectory, 'data'));
 });
 
 test('QUESTRA_DATA_DIR 可以把数据库放到安装目录之外', () => {

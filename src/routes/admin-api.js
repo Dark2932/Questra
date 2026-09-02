@@ -10,7 +10,7 @@ const { deleteUserSessions } = require('../user-session');
 const { setSetting } = require('../settings');
 const { getSiteSettings, updateSiteSettings } = require('../settings');
 
-function createAdminApi({ db, surveyService, config, app, updateService, accessPolicy, emailService }) {
+function createAdminApi({ db, surveyService, config, app, updateService, onUpdateQueued, accessPolicy, emailService }) {
   const router = express.Router();
 
   router.get('/dashboard', (req, res) => {
@@ -124,7 +124,11 @@ function createAdminApi({ db, surveyService, config, app, updateService, accessP
   });
 
   router.post('/update/install', asyncRoute(async (req, res) => {
-    res.json(await updateService.installLatest());
+    const result = await updateService.installLatest();
+    if (result.updateQueued && typeof onUpdateQueued === 'function') {
+      res.once('finish', onUpdateQueued);
+    }
+    res.json(result);
   }));
 
   router.get('/questions', (req, res) => {

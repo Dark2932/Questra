@@ -5,10 +5,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Command } = require('commander');
-const { loadConfig } = require('../src/config');
+const { installationDirectory, loadConfig } = require('../src/config');
 const { loadOrCreateAdminToken } = require('../src/admin-token');
 const { openDatabase, migrate } = require('../src/db');
 const { createApp } = require('../src/app');
+const { migrateLegacyDefaultData } = require('../src/data-migration');
+const { createUpdateLauncher } = require('../src/update-launcher');
+const { createUpdateService } = require('../src/update-service');
 const { accessUrl } = require('../src/cli-output');
 const { spawn } = require('node:child_process');
 const {
@@ -20,6 +23,15 @@ const {
 } = require('../src/runtime-state');
 
 const program = new Command();
+
+async function loadRuntimeConfig(configPath) {
+  const config = loadConfig(configPath);
+  const legacyMigration = await migrateLegacyDefaultData({ config, installationDirectory });
+  if (legacyMigration.migrated) {
+    console.log(`已将旧版默认数据迁移至: ${path.dirname(legacyMigration.targetDatabase)}`);
+  }
+  return config;
+}
 
 function getRunningState() {
   const state = readRuntimeState();
@@ -75,7 +87,7 @@ program
       throw new Error('Questra 已在运行中（PID ' + existing.pid + '，端口 ' + existing.port + '）');
     }
     if (!options.foreground && process.env.QUESTRA_DAEMON !== '1') {
-      const config = loadConfig(options.config);
+      const config = await loadRuntimeConfig(options.config);
       const port = Number(options.port || process.env.PORT || config.port || 3000);
       const host = options.host || process.env.HOST || config.host || '0.0.0.0';
       const args = [path.resolve(__filename), 'start'];
@@ -99,11 +111,11 @@ program
       console.log('日志文件: ' + logFile);
       return;
     }
-    const config = loadConfig(options.config);
+    const config = await loadRuntimeConfig(options.config);
     const port = Number(options.port || process.env.PORT || config.port || 3000);
     const host = options.host || process.env.HOST || config.host || '0.0.0.0';
-    const adminToken = loadOrCreateAdminToken({ database: config.database });
     const configPath = path.resolve(process.cwd(), options.config || 'survey.config.js');
+    const adminToken = loadOrCreateAdminToken({ database: config.database });
     let db;
     let server;
     let shuttingDown = false;
@@ -125,7 +137,24 @@ program
     const startServer = () => new Promise((resolve, reject) => {
       db = openDatabase(config.database);
       migrate(db);
-      const app = createApp({ db, config, adminToken });
+      const installPackage = createUpdateLauncher({
+        database: config.database,
+        installationDirectory,
+        cliPath: __filename,
+        cwd: process.cwd(),
+        configPath,
+        port,
+        host,
+        foreground: Boolean(options.foreground)
+      });
+      const updateService = createUpdateService({ installPackage });
+      const app = createApp({
+        db,
+        config,
+        adminToken,
+        updateService,
+        onUpdateQueued: () => { void shutdown('update'); }
+      });
       server = app.listen(port, host);
       server.once('listening', () => {
         writeRuntimeState({
@@ -168,9 +197,10 @@ program
       if (shuttingDown) return;
       shuttingDown = true;
       if (reason === 'stop') console.log('\n正在停止 Questra...');
+      if (reason === 'update') console.log('\n正在关闭 Questra 以安装更新...');
       try {
         await closeServer();
-        console.log('Questra 已停止。');
+        console.log(reason === 'update' ? 'Questra 已关闭，更新器将完成安装并重新启动服务。' : 'Questra 已停止。');
         process.exitCode = 0;
       } catch (error) {
         console.error(`停止失败: ${error.message}`);
@@ -187,8 +217,8 @@ program
   .command('migrate')
   .description('创建或升级 SQLite 数据库表结构')
   .option('-c, --config <path>', '配置文件路径')
-  .action((options) => {
-    const config = loadConfig(options.config);
+  .action(async (options) => {
+    const config = await loadRuntimeConfig(options.config);
     const db = openDatabase(config.database);
     const applied = migrate(db);
     db.close();
@@ -266,7 +296,7 @@ program
   .option('-c, --config <path>', '配置文件路径')
   .option('-o, --output <path>', '备份文件输出路径')
   .action(async (options) => {
-    const config = loadConfig(options.config);
+    const config = await loadRuntimeConfig(options.config);
     const db = openDatabase(config.database);
     const defaultName = `questra-backup-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.db`;
     const output = path.resolve(path.dirname(config.database), options.output || defaultName);

@@ -58,6 +58,7 @@ function isProcessRunning(pid) {
 }
 
 module.exports = {
+  runtimeDirectory,
   runtimeFile,
   runtimeLogFile,
   readRuntimeState,

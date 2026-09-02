@@ -3,8 +3,7 @@
 module.exports = {
   port: 3000,
   host: '0.0.0.0',
-  // 默认位于 Questra 安装目录的 data/；也可用绝对路径指定外部数据盘。
-  database: './data/questra.db',
+  // 全局安装默认使用用户目录下的 .questra/data；自定义位置推荐设置 QUESTRA_DATA_DIR。
   siteName: '我的问卷',
   // 邮箱验证和密码重置需要 SMTP；publicUrl 用于生成邮件中的绝对链接。
   publicUrl: 'https://survey.example.com',

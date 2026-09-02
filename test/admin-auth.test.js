@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { setImmediate } = require('node:timers');
 const { openDatabase, migrate } = require('../src/db');
 const { createApp } = require('../src/app');
 
@@ -14,6 +15,7 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
   const db = openDatabase(path.join(tempDir, 'test.db'));
   migrate(db);
   const updateCalls = [];
+  let updateShutdownRequested = false;
   const updateInfo = {
     currentVersion: '0.3.3', latestVersion: '0.4.0', updateAvailable: true, previewVersion: false,
     releaseName: 'Questra 0.4.0', releaseUrl: 'https://github.com/Dark2932/Questra/releases/tag/v0.4.0',
@@ -22,9 +24,15 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
   const updateService = {
     getUpdateStatus: () => ({ currentVersion: '0.3.3', installationType: 'global', sourceBuild: false, updateSupported: true, checked: false }),
     checkForUpdate: async () => { updateCalls.push('check'); return updateInfo; },
-    installLatest: async () => { updateCalls.push('install'); return { ...updateInfo, installedVersion: '0.4.0', restartRequired: true, output: 'ok' }; }
+    installLatest: async () => { updateCalls.push('install'); return { ...updateInfo, installedVersion: '0.4.0', restartRequired: true, updateQueued: true, output: 'ok' }; }
   };
-  const app = createApp({ db, adminToken: 'legacy-token', config: { siteName: 'Questra', hooks: {} }, updateService });
+  const app = createApp({
+    db,
+    adminToken: 'legacy-token',
+    config: { siteName: 'Questra', hooks: {} },
+    updateService,
+    onUpdateQueued: () => { updateShutdownRequested = true; }
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -63,6 +71,8 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
   assert.equal((await json(updateStatus)).installationType, 'global');
   const install = await fetch(`${baseUrl}/api/admin/update/install`, { method: 'POST', headers: { cookie: setupCookie } });
   assert.equal((await json(install)).restartRequired, true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(updateShutdownRequested, true);
   assert.deepEqual(updateCalls, ['check', 'install']);
 
   const nickname = await fetch(`${baseUrl}/api/admin/settings/account`, {

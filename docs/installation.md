@@ -99,7 +99,6 @@ pnpm run start
 ```js
 port: 3000,
 host: '0.0.0.0',
-database: './data/questra.db',
 siteName: '团队反馈中心',
 logging: true,
 hooks: {...}
@@ -129,7 +128,9 @@ email: {
 
 ### 数据目录
 
-Questra 从启动命令所在目录读取可选的 `survey.config.js`，但相对数据库路径以 Questra 安装根目录为基准。默认文件为安装根目录下的 `data/questra.db` 和 `.admin-token`。生产环境应设置 `QUESTRA_DATA_DIR`，使数据不随 npm 包升级或卸载：
+Questra 从启动命令所在目录读取可选的 `survey.config.js`。源码构建版默认把数据库放在仓库的 `data/`；npm 或 Release `.tgz` 全局安装版默认使用用户目录下的 `.questra/data/questra.db`，Admin Token 与数据库放在同一目录。全局默认目录不属于 npm 包，因此升级或重装不会删除运行数据。
+
+生产部署仍可用 `QUESTRA_DATA_DIR` 指向单独的数据盘。配置文件中显式填写的相对 `database` 路径仍以 Questra 安装根目录为基准；为避免全局包被替换时丢失数据，应使用绝对路径，并确保它不位于 npm 全局包目录内：
 
 PowerShell：
 
@@ -189,10 +190,30 @@ Questra 使用 SQLite WAL 在线备份 API。不要只复制主 `.db` 文件；�
 使用 npm 全局安装或 GitHub Release `.tgz` 全局安装的实例，可以在“设置 → 更新”中完成以下操作。源码构建版会在页面加载时被识别并禁用在线更新功能。
 
 1. “检测更新”访问 Questra 的 GitHub Releases，先确认当前版本号是否存在于已发布的正式 Release 列表，再比较最新正式版本。草稿、预发布和不存在于列表中的版本都不合规；不合规版本会禁用更新操作，并提示重新安装最新正式版。合规版本会显示最新版本以及落后了多少个正式版本。
-2. 有新版本时，“安装新版本”会先要求二次确认，再在服务器执行 `npm install --global questra@<最新版>`。版本号来自服务端重新获取并校验的 Release 标签，页面不能传入任意包名或命令。
-3. 安装成功后重启 Questra。正在运行的进程不会自动替换为新版本；重启前页面和接口仍由旧版本提供。
+2. 有新版本时，“安装新版本”会先要求二次确认。请求完成后，Questra 关闭 Web 服务和 SQLite；独立更新器等待旧进程完全退出，再执行 `npm install --global questra@<最新版>`，避免 Windows 锁定数据库或原生模块。版本号来自服务端重新获取并校验的 Release 标签，页面不能传入任意包名或命令。
+3. 安装结束后，更新器使用原工作目录、配置文件、端口和监听地址自动启动 Questra。期间页面短暂无法访问属于正常现象；更新结果记录在用户目录的 `.questra/update/status.json`，详细输出位于 `.questra/update/update.log`。
 
-服务器必须能够访问 GitHub 和 npm，并拥有 npm 全局目录的写权限。权限不足、GitHub API 限流或 npm 安装失败时，页面会显示具体错误；可在服务器终端修复权限或网络问题后重试。
+服务器必须能够访问 GitHub 和 npm，并拥有 npm 全局目录的写权限。显式配置的数据库若位于 Questra 安装目录内，在线更新会拒绝执行；先备份并将数据库迁移到外部目录。`--foreground` 通常由 systemd、PM2 等进程管理器托管，为避免管理器在安装完成前抢先拉起旧进程，该模式不执行在线安装；先停止进程管理器，手动运行 npm 安装，再恢复服务。权限不足、GitHub API 限流或 npm 安装失败时，检查上述更新状态与日志；更新器会尝试重新启动原版本。
+
+### 从旧版首次升级
+
+不包含独立更新器的旧版本仍会在运行进程内调用 npm，无法通过安装新版本本身修复这一行为。若旧版数据位于 npm 全局包的 `data/`，首次升级到包含本修复的版本需要在终端完成一次迁移和手动安装。先使用 `questra backup --output <用户目录>/.questra/data/questra.db` 生成 WAL 一致的备份，再把原数据目录中的 `.admin-token` 复制到新目录；随后停止 Questra、执行 `npm install --global questra@latest` 并按原启动参数启动。完成这次迁移后，后续版本即可从管理后台更新。
+
+Windows PowerShell 示例（把 `0.4.0` 替换为实际包含本修复的正式版本）：
+
+```powershell
+$targetVersion = '0.4.0'
+$oldPackage = Join-Path (npm root --global) 'questra'
+$newData = Join-Path $HOME '.questra\data'
+New-Item -ItemType Directory -Force -Path $newData | Out-Null
+questra backup --output (Join-Path $newData 'questra.db')
+Copy-Item -LiteralPath (Join-Path $oldPackage 'data\.admin-token') -Destination $newData
+questra stop
+npm install --global "questra@$targetVersion" --no-audit --no-fund
+questra start
+```
+
+`backup` 必须在停止旧服务之前完成，才能通过 SQLite 备份 API 合并 WAL 中的数据；不要只复制正在使用的 `questra.db`。若原实例使用了自定义 `--port`、`--host` 或 `--config`，最后一条启动命令应继续传入相同参数。
 
 更新页面始终安装 npm 全局包，不会修改 Git 源码目录。源码构建版不支持检测更新和安装新版本；如需最新版代码，请前往 [Questra 源码仓库](https://github.com/Dark2932/Questra)，先备份数据，再获取目标版本、重新安装依赖和构建前端，最后重启源码进程。若当前全局命令由 `npm link` 指向源码，后台安装也不能替代源码的版本控制与构建流程。
 

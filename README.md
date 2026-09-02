@@ -102,7 +102,7 @@ questra backup
 
 全部全局命令、选项以及源码目录中的 npm/pnpm 脚本见[命令参考](docs/commands.md)。
 
-生产环境应把数据放到安装目录之外，并在公网访问时配置 HTTPS。具体路径、环境变量和不同平台的部署方式见[安装与部署](docs/installation.md)。
+全局安装默认把数据保存在用户目录的 `.questra/data`，源码构建默认使用仓库 `data/`；生产环境也可指定独立数据盘。具体路径、环境变量、在线更新和不同平台的部署方式见[安装与部署](docs/installation.md)。
 
 ## 补充
 

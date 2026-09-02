@@ -120,7 +120,7 @@ test('安装最新版会重新检测 Release 并返回重启提示', async () =>
     fetchImpl: async () => response([release({ tag_name: 'v0.3.3' }), release()]),
     installPackage: async (version) => {
       installed.push(version);
-      return '安装成功';
+      return { updateQueued: true, restartRequired: true, output: '任务已排队' };
     }
   });
 
@@ -128,7 +128,8 @@ test('安装最新版会重新检测 Release 并返回重启提示', async () =>
   assert.deepEqual(installed, ['0.4.0']);
   assert.equal(result.installedVersion, '0.4.0');
   assert.equal(result.restartRequired, true);
-  assert.equal(result.output, '安装成功');
+  assert.equal(result.updateQueued, true);
+  assert.equal(result.output, '任务已排队');
 });
 
 test('npm 安装失败时保留可诊断输出', async () => {

@@ -24,7 +24,7 @@ function setSessionCookie(res, token, secure = false) {
   res.setHeader('Set-Cookie', `questra_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Max-Age=604800; SameSite=Lax${secureFlag}`);
 }
 
-function createApp({ db, config, adminToken, updateService = createUpdateService(), emailService = null, clientBundleAvailable = null }) {
+function createApp({ db, config, adminToken, updateService = createUpdateService(), onUpdateQueued = null, emailService = null, clientBundleAvailable = null }) {
   const app = express();
   const siteSettings = getSiteSettings(db, config.siteName || 'Questra');
   config.siteName = siteSettings.siteName;
@@ -155,7 +155,7 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
 
   app.get('/', (req, res) => res.redirect('/admin'));
   app.use(createPublicRoutes({ db, config, surveyService, submitLimiter, accessPolicy, userAuth: (req) => getUserAuth(req, db) }));
-  app.use('/api/admin', adminWriteLimiter, adminAuth, createAdminApi({ db, surveyService, config, app, updateService, accessPolicy, emailService: userMailer }));
+  app.use('/api/admin', adminWriteLimiter, adminAuth, createAdminApi({ db, surveyService, config, app, updateService, onUpdateQueued, accessPolicy, emailService: userMailer }));
 
   if (spaAvailable) {
     app.use('/assets', express.static(path.join(distPath, 'assets'), { maxAge: '1h', immutable: true }));
