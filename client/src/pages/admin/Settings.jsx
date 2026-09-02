@@ -229,6 +229,10 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
     </div> },
     { key: 'update', label: <Space><CloudDownloadOutlined />更新</Space>, children: <div style={{ maxWidth: 680 }}>
       <Title level={4}>更新</Title><Paragraph type="secondary">从 GitHub Releases 检测正式版本，并使用 npm 安装更新。</Paragraph>
+      <Space wrap style={{ marginBottom: 16 }}>
+        <Button type="primary" icon={<ReloadOutlined />} loading={updateChecking} disabled={updateInstalling || updateBlocked || !updateInfo} onClick={checkForUpdate}>检测更新</Button>
+        <Button icon={<CloudDownloadOutlined />} loading={updateInstalling} disabled={!updateInfo?.updateAvailable || !updateInfo?.updateSupported || updateChecking} onClick={confirmInstallUpdate}>安装新版本</Button>
+      </Space>
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         {updateInfo?.sourceBuild && <Alert type="info" showIcon message="当前版本为源码构建版" description={<Space direction="vertical" size={4}><Text>源码构建版无法使用检测更新和安装新版本功能。</Text><Typography.Link href={updateInfo.sourceRepositoryUrl} target="_blank" rel="noreferrer">前往 Questra 源码仓库查看变更</Typography.Link></Space>} />}
         {updateInfo && !updateInfo.sourceBuild && !updateInfo.checked && <Alert type="info" showIcon message="尚未检测更新" description="点击“检测更新”后，系统会对新旧版本分别进行检测于验证。" />}
@@ -247,10 +251,6 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
         {updateInfo?.releaseNotes && <div><Text strong>最新正式版说明</Text><Paragraph className="update-release-notes">{updateInfo.releaseNotes}</Paragraph></div>}
         {installResult && <Alert type="info" showIcon message={`Questra ${installResult.installedVersion} 更新任务已排队`} description="服务将短暂关闭，并在 npm 安装结束后自动按原参数启动。稍后重新打开此页面即可确认版本。" />}
         {installResult?.output && <details className="update-install-output"><summary>查看任务信息</summary><pre>{installResult.output}</pre></details>}
-        <Space wrap>
-          <Button type="primary" icon={<ReloadOutlined />} loading={updateChecking} disabled={updateInstalling || updateBlocked || !updateInfo} onClick={checkForUpdate}>检测更新</Button>
-          <Button icon={<CloudDownloadOutlined />} loading={updateInstalling} disabled={!updateInfo?.updateAvailable || !updateInfo?.updateSupported || updateChecking} onClick={confirmInstallUpdate}>安装新版本</Button>
-        </Space>
         <Text type="secondary">此功能需要服务器能够访问 GitHub 和 npm，并拥有写入 npm 全局安装目录的权限。源码运行或权限不足时，可按安装文档手动升级。</Text>
       </Space>
     </div> }

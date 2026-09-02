@@ -86,14 +86,14 @@ export default function AdminLayout({ authenticated, site, user, onLogout, theme
           <nav className="admin-nav" aria-label="管理导航">
             <Link className={location.pathname === '/admin' ? 'active' : ''} to="/admin"><DashboardOutlined />仪表盘</Link>
             <Link className={location.pathname.startsWith('/admin/questions') ? 'active' : ''} to="/admin/questions"><FormOutlined />题库</Link>
-            <Link className={location.pathname.startsWith('/admin/surveys') ? 'active' : ''} to="/admin/surveys"><UnorderedListOutlined />问卷 / 考试</Link>
+            <Link className={location.pathname.startsWith('/admin/surveys') ? 'active' : ''} to="/admin/surveys"><UnorderedListOutlined />问卷</Link>
             <Link className={location.pathname.startsWith('/admin/users') ? 'active' : ''} to="/admin/users"><UserOutlined />用户</Link>
             <Link className={location.pathname.startsWith('/admin/plugins') ? 'active' : ''} to="/admin/plugins"><AppstoreOutlined />插件</Link>
             <Link className={location.pathname.startsWith('/admin/settings') ? 'active' : ''} to="/admin/settings"><SettingOutlined />设置</Link>
             <Dropdown menu={{ items: [
               { key: '/admin', label: '仪表盘' },
               { key: '/admin/questions', label: '题库' },
-              { key: '/admin/surveys', label: '问卷 / 考试' },
+              { key: '/admin/surveys', label: '问卷' },
               { key: '/admin/users', label: '用户' },
               { key: '/admin/plugins', label: '插件' },
               { key: '/admin/settings', label: '设置' },

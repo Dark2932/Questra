@@ -24,8 +24,8 @@ export default function Users() {
     try { await api.deleteUser(user.id); await load(); message.success('用户已删除，历史答卷已匿名化'); }
     catch (e) { message.error(e.message); }
   };
-  return <Space direction="vertical" size={20} style={{ width: '100%' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><Typography.Title level={3} style={{ margin: 0 }}>用户管理</Typography.Title><Typography.Text type="secondary">查看普通用户状态、参与记录并管理会话。</Typography.Text></div><Button icon={<ReloadOutlined />} onClick={load}>刷新</Button></div>
+  return <Space direction="vertical" size={24} style={{ width: '100%' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}><div><Typography.Text type="secondary">USER MANAGEMENT</Typography.Text><Typography.Title level={3} style={{ marginTop: 4, marginBottom: 0 }}>用户管理</Typography.Title></div><Button icon={<ReloadOutlined />} onClick={load}>刷新</Button></div>
     {error && <Alert type="error" showIcon message={error} />}
     <Card>{users?.length ? <Table rowKey="id" dataSource={users} scroll={{ x: 900 }} pagination={{ pageSize: 20 }} columns={[
       { title: '用户', render: (_, user) => <Space direction="vertical" size={0}><Typography.Text strong>{user.displayName}</Typography.Text><Typography.Text type="secondary">{user.email}</Typography.Text></Space>, fixed: 'left', width: 220 },

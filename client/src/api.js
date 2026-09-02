@@ -23,7 +23,14 @@ export const api = {
   login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
-  getDashboard: () => request('/admin/dashboard'),
+  getDashboard: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') params.set(key, value);
+    });
+    const query = params.toString();
+    return request(`/admin/dashboard${query ? `?${query}` : ''}`);
+  },
   getSettings: () => request('/admin/settings'),
   getUserSettings: () => request('/admin/user-settings'),
   updateUserSettings: (data) => request('/admin/user-settings', { method: 'PUT', body: JSON.stringify(data) }),

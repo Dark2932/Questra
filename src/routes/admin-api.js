@@ -9,33 +9,19 @@ const { deleteAccountSessions } = require('../admin-session');
 const { deleteUserSessions } = require('../user-session');
 const { setSetting } = require('../settings');
 const { getSiteSettings, updateSiteSettings } = require('../settings');
+const { getDashboardData } = require('../services/dashboard-service');
 
 function createAdminApi({ db, surveyService, config, app, updateService, onUpdateQueued, accessPolicy, emailService }) {
   const router = express.Router();
 
   router.get('/dashboard', (req, res) => {
-    const totals = db.prepare(`
-      SELECT
-        (SELECT COUNT(*) FROM question_pool) AS questions,
-        (SELECT COUNT(*) FROM surveys) AS surveys,
-        (SELECT COUNT(*) FROM surveys WHERE status = 'active' AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))) AS active_surveys,
-        (SELECT COUNT(*) FROM responses) AS responses
-    `).get();
-    const trend = db.prepare(`
-      WITH RECURSIVE days(day) AS (
-        SELECT date('now', '-6 day') UNION ALL
-        SELECT date(day, '+1 day') FROM days WHERE day < date('now')
-      )
-      SELECT days.day, COUNT(responses.id) AS count
-      FROM days LEFT JOIN responses ON date(responses.submitted_at) = days.day
-      GROUP BY days.day ORDER BY days.day
-    `).all();
+    const dashboard = getDashboardData(db, req.query);
     const recentSurveys = db.prepare(`
       SELECT s.*, (SELECT COUNT(*) FROM responses r WHERE r.survey_id = s.id) AS response_count,
         (SELECT COUNT(*) FROM survey_questions q WHERE q.survey_id = s.id AND q.is_active = 1) AS question_count
       FROM surveys s ORDER BY s.created_at DESC LIMIT 5
     `).all();
-    res.json({ totals, trend, recentSurveys });
+    res.json({ ...dashboard, recentSurveys });
   });
 
   router.get('/settings', (req, res) => {

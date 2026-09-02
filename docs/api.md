@@ -72,7 +72,7 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| `GET` | `/api/admin/dashboard` | 题目、实例、答卷总数和趋势 |
+| `GET` | `/api/admin/dashboard` | 仪表盘指标、按实例趋势和最新回收流水 |
 | `GET` | `/api/admin/settings` | 站点和管理员资料 |
 | `PUT` | `/api/admin/settings/site` | 修改站点名称和图标 |
 | `PUT` | `/api/admin/settings/account` | 修改唯一管理员昵称、账号或密码 |
@@ -102,6 +102,12 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `DELETE` | `/api/admin/surveys/:id` | 删除实例及其答卷 |
 | `GET` | `/api/admin/surveys/:id/responses` | 查看答卷与逐题判分 |
 | `GET` | `/api/admin/surveys/:id/export` | 导出 CSV 或 JSON；`includePersonalInfo=1` 时显式包含完整邮箱，默认不包含 |
+
+### 仪表盘统计
+
+`GET /api/admin/dashboard` 默认查询包含当前 UTC 日期在内的近 7 天趋势。`range=month` 查询近 30 天；`range=custom&startDate=2026-08-01&endDate=2026-08-31` 按 `YYYY-MM-DD` 指定包含首尾的 UTC 自然日范围。自定义范围最长 366 天，日期缺失、无效、倒置或超过上限时返回 `400`。
+
+响应中的 `totals` 提供题库题量、实例总量、有效活跃实例数、累计答卷数和近 7 天考试平均得分率。考试平均分按每份答卷的 `score / maxScore * 100` 标准化；没有可计分答卷时为 `null`。`trend` 是每日总量，`trendBySurvey` 是每日按实例分组的数据，`surveyTotals` 是所选范围内各实例汇总，`recentResponses` 是全站最近 20 条真实答卷流水。流水状态只包含已成功写入的 `submitted` 和已完成计分的 `graded`。原有 `active_surveys` 与 `recentSurveys` 字段继续保留以兼容已有调用。
 
 更新状态接口返回 `installationType`（`source` 或 `global`）、`sourceBuild` 和 `updateSupported`，用于在联网前识别源码构建版。源码构建版不会访问 GitHub，检测和安装操作均被禁用，并提供源码仓库入口。
 
