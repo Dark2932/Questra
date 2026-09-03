@@ -27,15 +27,15 @@ function seriesColor(id, colors) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-function TooltipBox({ label, children }) {
-  return <div className="dashboard-chart-tooltip"><Text strong>{label}</Text>{children}</div>;
+function TooltipBox({ label, date, children }) {
+  return <div className="dashboard-chart-tooltip"><Text strong>{label}</Text>{children}{date && <Text type="secondary" className="dashboard-tooltip-date">日期：{date}</Text>}</div>;
 }
 
 function DayTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   const day = payload[0]?.payload;
   if (!day) return null;
-  return <TooltipBox key={label} label={label}>
+  return <TooltipBox key={day.day || label} label="当天回收" date={day.day || label}>
     <Text type="secondary">当天合计 {day.total} 份</Text>
     {day.breakdown.map((item) => <div className="dashboard-tooltip-row" key={item.surveyId}>
       <span>{item.surveyTitle}</span><Text>{item.count} 份</Text>
@@ -48,8 +48,9 @@ function BarTooltip({ active, payload, label }) {
   const item = payload[0];
   const count = Number(item.value || 0);
   const total = Number(item.payload?.total || 0);
-  return <TooltipBox key={`${label}-${item.name}`} label={item.name}>
-    <Text type="secondary">{label} 回收 {count} 份</Text>
+  const date = item.payload?.day || label;
+  return <TooltipBox key={`${date}-${item.name}`} label={item.name} date={date}>
+    <Text type="secondary">回收 {count} 份</Text>
     <Text type="secondary">占当天 {total ? Math.round(count * 1000 / total) / 10 : 0}%</Text>
   </TooltipBox>;
 }

@@ -172,10 +172,11 @@ export default function Dashboard() {
       <RecoveryTrendChart type={chartType} daily={chartData.daily} series={chartData.series} surveyTotals={surveyTotals} />
     </Card>
 
-    <Card
-      title={<Space size={8}><span className="dashboard-listening-dot" aria-hidden="true" /><Text strong>监听中</Text></Space>}
-      extra={lastUpdatedAt && <Text type="secondary">最近刷新 {lastUpdatedAt.toLocaleTimeString('zh-CN', { hour12: false })}</Text>}
-    >
+    <Card className="dashboard-live-card" title={<div className="dashboard-listening-header">
+      <span aria-hidden="true" />
+      <Space size={8} className="dashboard-listening-title"><Text strong>监听中</Text><span className="dashboard-listening-dot" aria-hidden="true" /></Space>
+      {lastUpdatedAt && <Text type="secondary" className="dashboard-last-updated">最近刷新 {lastUpdatedAt.toLocaleTimeString('zh-CN', { hour12: false })}</Text>}
+    </div>}>
       <Table
         size="small"
         rowKey="id"
