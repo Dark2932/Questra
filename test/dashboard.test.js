@@ -33,7 +33,7 @@ test('仪表盘接口按真实答卷聚合指标、趋势和最新流水', async
   db.prepare("INSERT INTO question_pool (title, type) VALUES ('题目一', 'text'), ('题目二', 'text')").run();
   const insertSurvey = db.prepare('INSERT INTO surveys (id, title, status, expires_at, kind, max_score) VALUES (?, ?, ?, ?, ?, ?)');
   insertSurvey.run('survey-a', '客户反馈', 'active', null, 'survey', null);
-  insertSurvey.run('exam-a', '安全考试', 'active', null, 'exam', 100);
+  insertSurvey.run('exam-a', '安全考试', 'active', `${utcDay(3)} 00:00:00`, 'exam', 100);
   insertSurvey.run('expired-a', '已过期问卷', 'active', '2020-01-01 00:00:00', 'survey', null);
   insertSurvey.run('closed-a', '已关闭问卷', 'closed', null, 'survey', null);
 
@@ -42,6 +42,13 @@ test('仪表盘接口按真实答卷聚合指标、趋势和最新流水', async
   insertResponse.run('response-today-exam', 'exam-a', `${utcDay()} 10:00:00`, 100, 100);
   insertResponse.run('response-today-survey', 'survey-a', `${utcDay()} 11:00:00`, null, null);
   insertResponse.run('response-old', 'exam-a', `${utcDay(-10)} 08:00:00`, 0, 100);
+  db.prepare("INSERT INTO users (id, email, email_normalized, display_name, password_hash, password_salt, status) VALUES ('user-a', 'reader@example.com', 'reader@example.com', '小明', 'hash', 'salt', 'active')").run();
+  db.prepare("UPDATE responses SET user_id = 'user-a' WHERE id = 'response-today-exam'").run();
+  const question = db.prepare("INSERT INTO survey_questions (survey_id, pool_question_id, title, type, options_json, is_required, sort_order, correct_answer_json, points) VALUES ('exam-a', 1, '安全规范', 'single', '[\"是\",\"否\"]', 1, 0, '\"是\"', 100)").run();
+  const insertAnswer = db.prepare("INSERT INTO answers (response_id, survey_question_id, value_json, is_correct, awarded_score) VALUES (?, ?, '\"否\"', 0, 0)");
+  insertAnswer.run('response-yesterday', question.lastInsertRowid);
+  insertAnswer.run('response-today-exam', question.lastInsertRowid);
+  insertAnswer.run('response-old', question.lastInsertRowid);
 
   const response = await fetch(`${baseUrl}/api/admin/dashboard?range=custom&startDate=${utcDay(-1)}&endDate=${utcDay()}`, { headers });
   assert.equal(response.status, 200);
@@ -71,6 +78,10 @@ test('仪表盘接口按真实答卷聚合指标、趋势和最新流水', async
   assert.equal(dashboard.recentResponses[0].status, 'submitted');
   assert.equal(dashboard.recentResponses[1].status, 'graded');
   assert.equal(dashboard.recentResponses[1].score, 100);
+  assert.deepEqual(dashboard.recentResponses[1].participant, { displayName: '小明' });
+  assert.deepEqual(dashboard.todayOverview, { responses: 2, exams: 1, passRate: 100 });
+  assert.deepEqual(dashboard.alerts.highErrorQuestions, [{ id: question.lastInsertRowid, title: '安全规范', attempts: 3, errorRate: 100 }]);
+  assert.deepEqual(dashboard.alerts.expiringSurveys, [{ id: 'exam-a', title: '安全考试', kind: 'exam', expiresAt: `${utcDay(3)}T00:00:00Z` }]);
   assert.ok(Array.isArray(dashboard.recentSurveys), '应保留原有最近实例字段');
 });
 

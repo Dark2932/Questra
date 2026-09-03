@@ -33,6 +33,8 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
   config.siteInitial = siteSettings.siteInitial;
   config.siteInitialColor = siteSettings.siteInitialColor;
   config.themeColor = siteSettings.themeColor;
+  config.footerCopyright = siteSettings.footerCopyright;
+  config.footerProgram = siteSettings.footerProgram;
   const persistedRegistration = getSetting(db, 'user_registration_enabled', null);
   if (persistedRegistration !== null) config.userRegistration = persistedRegistration !== '0';
   const surveyService = createSurveyService(db);
@@ -57,6 +59,8 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
   app.locals.siteInitial = config.siteInitial;
   app.locals.siteInitialColor = config.siteInitialColor;
   app.locals.themeColor = config.themeColor;
+  app.locals.footerCopyright = config.footerCopyright;
+  app.locals.footerProgram = config.footerProgram;
   app.locals.defaultSiteIcon = DEFAULT_SITE_ICON_URL;
   app.use(securityHeaders);
   // 轻量请求日志直接输出到启动 Questra 的终端，便于个人服务器调试。
@@ -78,11 +82,11 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
 
   app.use(createUserAuthRoutes({ db, config, emailService: userMailer, registrationLimiter: userRegistrationLimiter, authLimiter: userAuthLimiter }));
 
-  app.get('/api/config', (req, res) => res.json({ siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor }));
+  app.get('/api/config', (req, res) => res.json({ siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor, footerCopyright: config.footerCopyright, footerProgram: config.footerProgram }));
 
   app.get('/api/setup/status', (req, res) => {
     const account = getAdminAccount(db);
-    res.json({ initialized: Boolean(account), siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor });
+    res.json({ initialized: Boolean(account), siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor, footerCopyright: config.footerCopyright, footerProgram: config.footerProgram });
   });
 
   app.post('/api/setup', loginLimiter, (req, res) => {
@@ -98,12 +102,16 @@ function createApp({ db, config, adminToken, updateService = createUpdateService
     config.siteInitial = created.settings.siteInitial;
     config.siteInitialColor = created.settings.siteInitialColor;
     config.themeColor = created.settings.themeColor;
+    config.footerCopyright = created.settings.footerCopyright;
+    config.footerProgram = created.settings.footerProgram;
     app.locals.siteName = config.siteName;
     app.locals.siteIcon = config.siteIcon;
     app.locals.siteIconAsInitial = config.siteIconAsInitial;
     app.locals.siteInitial = config.siteInitial;
     app.locals.siteInitialColor = config.siteInitialColor;
     app.locals.themeColor = config.themeColor;
+    app.locals.footerCopyright = config.footerCopyright;
+    app.locals.footerProgram = config.footerProgram;
     const session = createSession(db, created.account.id);
     setSessionCookie(res, session.token, req.secure);
     res.status(201).json({ user: created.account, site: created.settings });

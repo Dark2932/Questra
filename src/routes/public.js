@@ -12,7 +12,7 @@ function createPublicRoutes({ config, surveyService, submitLimiter, accessPolicy
     const policy = accessPolicy.getPolicy(survey.id);
     const viewer = accessPolicy.viewerState(policy, auth?.user || null);
     surveyService.ensureSurveyOpen(survey);
-    const response = { ...survey, siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor,
+    const response = { ...survey, siteName: config.siteName, siteIcon: config.siteIcon || '', siteIconAsInitial: config.siteIconAsInitial, siteInitial: config.siteInitial, siteInitialColor: config.siteInitialColor, themeColor: config.themeColor, footerCopyright: config.footerCopyright, footerProgram: config.footerProgram,
       accessPolicy: accessPolicy.publicPolicy(survey.id, auth?.user || null),
       viewer: { authenticated: viewer.authenticated, emailVerified: viewer.emailVerified } };
     if (viewer.authorized || !policy.requireLoginToView) return res.json(response);

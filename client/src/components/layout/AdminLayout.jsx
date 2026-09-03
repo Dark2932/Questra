@@ -16,8 +16,9 @@ import {
 } from '@ant-design/icons';
 import { api } from '../../api';
 import SiteMark from '../SiteMark';
+import SiteFooter from '../SiteFooter';
 
-const { Header, Content } = Layout;
+const { Header, Content, Footer } = Layout;
 const ADMIN_NAVIGATION_SECTIONS = ['/admin/questions', '/admin/surveys', '/admin/users', '/admin/plugins', '/admin/settings'];
 
 function adminNavigationSection(pathname) {
@@ -126,6 +127,7 @@ export default function AdminLayout({ authenticated, site, user, onLogout, theme
           </motion.div>
         </AnimatePresence>
       </Content>
+      <Footer className="admin-footer"><SiteFooter site={site} /></Footer>
     </Layout>
   );
 }

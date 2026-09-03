@@ -41,7 +41,7 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
   t.after(() => { server.close(); db.close(); fs.rmSync(tempDir, { recursive: true, force: true }); });
 
   const initial = await fetch(`${baseUrl}/api/setup/status`);
-  assert.deepEqual(await json(initial), { initialized: false, siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#0D9488' });
+  assert.deepEqual(await json(initial), { initialized: false, siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#0D9488', footerCopyright: 'Copyright © {year} {siteName}. All rights reserved.', footerProgram: 'powered_by' });
 
   const setup = await fetch(`${baseUrl}/api/setup`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -91,14 +91,20 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
 
   const updateSite = await fetch(`${baseUrl}/api/admin/settings/site`, {
     method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
-    body: JSON.stringify({ siteName: '我的站点', siteIcon: '/static/icon.png', siteIconAsInitial: true, siteInitial: '站点标识', siteInitialColor: 'rgb(255, 0, 128)', themeColor: '#336699' })
+    body: JSON.stringify({ siteName: '我的站点', siteIcon: '/static/icon.png', siteIconAsInitial: true, siteInitial: '站点标识', siteInitialColor: 'rgb(255, 0, 128)', themeColor: '#336699', footerCopyright: '© {{year}} {{siteName}}', footerProgram: 'built_with' })
   });
   const updatedSite = await json(updateSite);
   assert.equal(updatedSite.site.siteName, '我的站点');
   assert.equal(updatedSite.site.siteIconAsInitial, true);
   assert.equal(updatedSite.site.siteInitial, '站点标识');
   const config = await fetch(`${baseUrl}/api/config`);
-  assert.deepEqual(await json(config), { siteName: '我的站点', siteIcon: '/static/icon.png', siteIconAsInitial: true, siteInitial: '站点标识', siteInitialColor: 'rgb(255, 0, 128)', themeColor: '#336699' });
+  assert.deepEqual(await json(config), { siteName: '我的站点', siteIcon: '/static/icon.png', siteIconAsInitial: true, siteInitial: '站点标识', siteInitialColor: 'rgb(255, 0, 128)', themeColor: '#336699', footerCopyright: '© {{year}} {{siteName}}', footerProgram: 'built_with' });
+
+  const invalidFooterProgram = await fetch(`${baseUrl}/api/admin/settings/site`, {
+    method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ footerProgram: 'custom-html' })
+  });
+  assert.equal(invalidFooterProgram.status, 400);
 
   const uploadedIcon = `data:image/png;base64,${Buffer.alloc(300 * 1024).toString('base64')}`;
   const uploadSiteIcon = await fetch(`${baseUrl}/api/admin/settings/site`, {
@@ -113,13 +119,20 @@ test('首次初始化、账号登录和设置只允许一组管理员账户', as
     body: JSON.stringify({ siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488' })
   });
   const restoredSite = (await json(restoreSite)).site;
-  assert.deepEqual(restoredSite, { siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#336699' });
+  assert.deepEqual(restoredSite, { siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#336699', footerCopyright: '© {{year}} {{siteName}}', footerProgram: 'built_with' });
 
   const restorePersonalization = await fetch(`${baseUrl}/api/admin/settings/site`, {
     method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
     body: JSON.stringify({ themeColor: '#0D9488' })
   });
-  assert.deepEqual((await json(restorePersonalization)).site, { siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#0D9488' });
+  assert.deepEqual((await json(restorePersonalization)).site, { siteName: 'Questra', siteIcon: '', siteIconAsInitial: false, siteInitial: 'Q', siteInitialColor: '#0D9488', themeColor: '#0D9488', footerCopyright: '© {{year}} {{siteName}}', footerProgram: 'built_with' });
+
+  const blankFooterCopyright = await fetch(`${baseUrl}/api/admin/settings/site`, {
+    method: 'PUT', headers: { cookie: setupCookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ footerCopyright: '   ' })
+  });
+  assert.equal(blankFooterCopyright.status, 200);
+  assert.equal((await json(blankFooterCopyright)).site.footerCopyright, '');
 
   const login = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -141,7 +154,9 @@ test('旧数据库可以通过新增迁移升级到管理员账户结构', (t) =
     db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', name), 'utf8'));
     db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(name);
   }
-  assert.deepEqual(migrate(db), ['004_admin_accounts_settings.sql', '005_survey_question_revisions.sql', '006_user_auth_and_access.sql']);
+  assert.deepEqual(migrate(db), ['004_admin_accounts_settings.sql', '005_survey_question_revisions.sql', '006_user_auth_and_access.sql', '007_open_text.sql']);
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'admin_accounts'").get());
   assert.ok(db.prepare("SELECT name FROM pragma_table_info('survey_questions') WHERE name = 'is_active'").get());
+  assert.ok(db.prepare("SELECT name FROM pragma_table_info('question_pool') WHERE name = 'is_open_text'").get());
+  assert.ok(db.prepare("SELECT name FROM pragma_table_info('survey_questions') WHERE name = 'is_open_text'").get());
 });

@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 package-lock.json
 npm-shrinkwrap.json
 yarn.lock
@@ -32,10 +33,12 @@ yarn.lock
 /client/dist/
 /dist/
 /build/
-/coverage/
-/.nyc_output/
+coverage/
+.nyc_output/
 /docs/proposal/
 *.tsbuildinfo
+.eslintcache
+*.tgz
 
 # Logs and temporary files
 *.log
@@ -47,16 +50,25 @@ pnpm-debug.log*
 *.temp
 *.swp
 *.swo
+*~
 /.cache/
 /.tmp/
 /tmp/
 /temp/
 
-# Editors and operating systems
-/.idea/
+# Editors, local assistants and operating systems
+.idea/
 /.vscode/*
 !/.vscode/extensions.json
 !/.vscode/settings.example.json
+.history/
+.cursor/
+.claude/
+.codex/
 .DS_Store
+._*
+.Trashes
 Thumbs.db
+ehthumbs.db
+$RECYCLE.BIN/
 Desktop.ini

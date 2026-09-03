@@ -29,6 +29,7 @@ const forbidden = tracked.filter((file) => {
     || /(^|\/)(data|backup|backups|coverage|node_modules|dist)(\/|$)/.test(normalized)
     || /\.(?:db|sqlite|sqlite3)(?:-.+)?$/i.test(basename)
     || /\.(?:pem|key|p12|pfx|log)$/i.test(basename)
+    || /\.(?:tgz|tsbuildinfo|eslintcache)$/i.test(basename)
     || basename === '.admin-token';
 });
 
@@ -49,10 +50,14 @@ const ignorePolicy = [
   ['data/questra.db', true],
   ['data/questra.db-wal', true],
   ['client/dist/index.html', true],
+  ['client/coverage/index.html', true],
   ['package-lock.json', true],
   ['client/package-lock.json', true],
   ['pnpm-lock.yaml', false],
   ['backup/questra.db', true],
+  ['package.tgz', true],
+  ['.eslintcache', true],
+  ['src/data/fixtures.js', false],
   ['survey.config.example.js', false],
   ['src/app.js', false]
 ];

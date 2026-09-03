@@ -36,7 +36,7 @@ export default function Survey({ siteName }) {
   };
 
   const containerStyle = {
-    minHeight: '100vh',
+    minHeight: '100%',
     background: resolvedTheme === 'dark' ? '#000000' : '#f5f5f7',
     colorScheme: resolvedTheme,
     display: 'flex',
@@ -88,7 +88,7 @@ export default function Survey({ siteName }) {
   }
 
   return (
-    <ConfigProvider theme={surveyTheme}><div style={containerStyle}>
+    <ConfigProvider theme={surveyTheme}><div className="survey-page-shell" style={containerStyle}>
       <Segmented
         size="small"
         value={theme}
@@ -121,7 +121,7 @@ export default function Survey({ siteName }) {
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
               <CheckCircleOutlined style={{ fontSize: 48, color: 'var(--ant-color-success)', marginBottom: 16 }} />
               <Title level={4} style={{ marginTop: 0 }}>{survey.kind === 'exam' ? '试卷已提交' : '感谢参与'}</Title>
-              <Text type="secondary">{examResult ? `你的得分：${examResult.score} / ${examResult.maxScore} 分` : '你的答卷已成功提交。'}</Text>
+              <Text type="secondary">{examResult ? `你的得分：${examResult.score} / ${examResult.maxScore} 分` : '你的答卷已成功提交'}</Text>
               {examResult && (
                 <div style={{ marginTop: 24 }}>
                   <Statistic value={examResult.score}
@@ -132,9 +132,6 @@ export default function Survey({ siteName }) {
             </div>
           )}
         </Card>
-        <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>Powered by Questra</Text>
-        </div>
       </div>
     </div></ConfigProvider>
   );

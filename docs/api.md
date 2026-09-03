@@ -17,7 +17,7 @@ Authorization: Bearer <Admin Token>
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | `GET` | `/api/health` | 检查进程和数据库连接 |
-| `GET` | `/api/config` | 获取站点名称和图标 |
+| `GET` | `/api/config` | 获取站点名称、图标、主题和页脚配置 |
 | `GET` | `/api/setup/status` | 查询是否完成初始化 |
 | `POST` | `/api/setup` | 首次创建唯一管理员和站点设置 |
 | `POST` | `/api/auth/login` | 账号密码登录 |
@@ -74,7 +74,7 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | --- | --- | --- |
 | `GET` | `/api/admin/dashboard` | 仪表盘指标、按实例趋势和最新回收流水 |
 | `GET` | `/api/admin/settings` | 站点和管理员资料 |
-| `PUT` | `/api/admin/settings/site` | 修改站点名称和图标 |
+| `PUT` | `/api/admin/settings/site` | 修改站点标识、主题和页脚配置 |
 | `PUT` | `/api/admin/settings/account` | 修改唯一管理员昵称、账号或密码 |
 | `GET` | `/api/admin/update/status` | 查询当前版本的安装来源和更新能力 |
 | `GET` | `/api/admin/update` | 从 GitHub Releases 检测最新正式版本 |
@@ -103,11 +103,13 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
 | `GET` | `/api/admin/surveys/:id/responses` | 查看答卷与逐题判分 |
 | `GET` | `/api/admin/surveys/:id/export` | 导出 CSV 或 JSON；`includePersonalInfo=1` 时显式包含完整邮箱，默认不包含 |
 
+站点设置中的 `footerCopyright` 是最长 300 个字符的纯文本模板，支持 `{year}` 和 `{siteName}` 占位符，并继续兼容历史保存的 `{{year}}`、`{{siteName}}` 写法；去除首尾空白后为空表示页脚不显示版权文字。`footerProgram` 只接受 `powered_by`、`built_with` 或 `open_source`。`GET /api/config`、`GET /api/setup/status` 和公开问卷响应会返回当前页脚配置，前端不得把模板作为 HTML 执行。
+
 ### 仪表盘统计
 
 `GET /api/admin/dashboard` 默认查询包含当前 UTC 日期在内的近 7 天趋势。`range=month` 查询近 30 天；`range=custom&startDate=2026-08-01&endDate=2026-08-31` 按 `YYYY-MM-DD` 指定包含首尾的 UTC 自然日范围。自定义范围最长 366 天，日期缺失、无效、倒置或超过上限时返回 `400`。
 
-响应中的 `totals` 提供题库题量、实例总量、有效活跃实例数、累计答卷数和近 7 天考试平均得分率。考试平均分按每份答卷的 `score / maxScore * 100` 标准化；没有可计分答卷时为 `null`。`trend` 是每日总量，`trendBySurvey` 是每日按实例分组的数据，`surveyTotals` 是所选范围内各实例汇总，`recentResponses` 是全站最近 20 条真实答卷流水。流水状态只包含已成功写入的 `submitted` 和已完成计分的 `graded`。原有 `active_surveys` 与 `recentSurveys` 字段继续保留以兼容已有调用。
+响应中的 `totals` 提供题库题量、实例总量、有效活跃实例数、累计答卷数和近 7 天考试平均得分率。考试平均分按每份答卷的 `score / maxScore * 100` 标准化；没有可计分答卷时为 `null`。`trend` 是每日总量，`trendBySurvey` 是每日按实例分组的数据，`surveyTotals` 是所选范围内各实例汇总，`recentResponses` 是全站最近 20 条真实答卷流水，并包含 `participant.displayName` 或 `null`。`todayOverview` 提供当天回收量、考试提交数和通过率；通过率按已评分考试中得分率不低于 60% 的比例计算，无已评分考试时为 `null`。`alerts.highErrorQuestions` 是至少 3 次作答且错误率不低于 50% 的题目，`alerts.expiringSurveys` 是未来 7 天内到期的活跃实例。流水状态只包含已成功写入的 `submitted` 和已完成计分的 `graded`。原有 `active_surveys` 与 `recentSurveys` 字段继续保留以兼容已有调用。
 
 更新状态接口返回 `installationType`（`source` 或 `global`）、`sourceBuild` 和 `updateSupported`，用于在联网前识别源码构建版。源码构建版不会访问 GitHub，检测和安装操作均被禁用，并提供源码仓库入口。
 
@@ -124,13 +126,12 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
   "title": "你使用什么编辑器？",
   "type": "single",
   "options": ["VS Code", "Vim"],
-  "required": true,
   "correctAnswer": "VS Code",
   "groupIds": [2]
 }
 ```
 
-`type` 可为 `single`、`multiple`、`judgment` 或 `text`。判断题的选项固定为“正确”和“错误”；多选标准答案为数组；文本标准答案也可为多个可接受字符串。普通问卷可以省略 `correctAnswer`。
+`type` 可为 `single`、`multiple`、`judgment`、`text`（填空）或 `open_text`（开放文本）。判断题选项固定为“正确”和“错误”；多选标准答案为数组；填空题可配置多个可接受答案。开放文本不保存标准答案，在考试中不参与自动计分。题库仍接受旧请求中的 `required` 以保持兼容，但新的管理界面会在实例中设置是否必填。
 
 手动生成普通问卷：
 
@@ -140,27 +141,28 @@ curl -X POST http://localhost:3000/api/surveys/<survey-id>/responses \
   "title": "产品反馈",
   "description": "请用两分钟完成",
   "questionIds": [1, 2, 3],
+  "questionRequired": {"1": true, "2": false, "3": true},
   "selectionMode": "manual",
   "expiresAt": "2026-12-31T16:00:00.000Z"
 }
 ```
 
-随机生成时使用 `selectionMode: "random"`、可选 `sourceGroupId` 和按题型的 `randomCounts`：
+`questionRequired` 按题库题目 ID 设置实例快照的必填状态；未提供时沿用题库的历史默认值。随机生成时使用 `selectionMode: "random"`、可选 `sourceGroupId` 和按题型的 `randomCounts`：
 
 ```json
 {
   "kind": "exam",
   "title": "随机练习",
   "selectionMode": "random",
-  "sourceGroupId": 2,
-  "randomCounts": {"single": 5, "multiple": 2, "judgment": 3, "text": 0},
+  "sourceGroupId": "type:single",
+  "randomCounts": {"single": 5, "multiple": 0, "judgment": 0, "text": 0, "open_text": 0},
   "scoringMode": "weighted",
   "totalScore": 100,
   "typeWeights": {"single": 50, "multiple": 30, "judgment": 20}
 }
 ```
 
-考试中的每道题必须已有标准答案。`scoringMode` 为 `weighted` 时权重总和必须为 100；为 `per_question` 时传入 `questionScores` 对象。实例生成后题目和计分配置会保存为快照。
+`sourceGroupId` 可以是自定义分组 ID，也可以是 `type:single`、`type:multiple`、`type:judgment`、`type:text` 或 `type:open_text` 虚拟题型分组。考试中除开放文本外的每道题必须已有标准答案。`scoringMode` 为 `weighted` 时可自动评分题型的权重总和必须为 100；为 `per_question` 时传入 `questionScores` 对象。实例生成后题目、必填状态和计分配置会保存为快照。
 
 编辑实例可提交与创建时相同的结构字段，并可额外提交 `status`。即使实例已有答卷，也可以更换题目、选题方式、实例类型和计分配置；新结构用于后续提交，已有答卷引用的旧题目快照和提交时分数继续保留。答卷接口中的历史题目带有 `archived: true`。当 `expiresAt` 不为空且已到期时，服务端始终将 `status` 保存为 `closed`；只有同一次请求把截止时间改到未来，`status: active` 才会生效。
 

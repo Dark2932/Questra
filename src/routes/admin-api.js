@@ -36,12 +36,16 @@ function createAdminApi({ db, surveyService, config, app, updateService, onUpdat
     config.siteInitial = site.siteInitial;
     config.siteInitialColor = site.siteInitialColor;
     config.themeColor = site.themeColor;
+    config.footerCopyright = site.footerCopyright;
+    config.footerProgram = site.footerProgram;
     app.locals.siteName = site.siteName;
     app.locals.siteIcon = site.siteIcon;
     app.locals.siteIconAsInitial = site.siteIconAsInitial;
     app.locals.siteInitial = site.siteInitial;
     app.locals.siteInitialColor = site.siteInitialColor;
     app.locals.themeColor = site.themeColor;
+    app.locals.footerCopyright = site.footerCopyright;
+    app.locals.footerProgram = site.footerProgram;
     res.json({ site });
   });
 
@@ -130,14 +134,14 @@ function createAdminApi({ db, surveyService, config, app, updateService, onUpdat
   router.post('/questions', (req, res) => {
     const question = surveyService.normalizeQuestion(req.body);
     const result = db.prepare(`
-      INSERT INTO question_pool (title, type, options_json, is_required, correct_answer_json, is_judgment) VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO question_pool (title, type, options_json, is_required, correct_answer_json, is_judgment, is_open_text) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       question.title,
       question.type,
       JSON.stringify(question.options),
       Number(question.required),
       question.correctAnswer === null ? null : JSON.stringify(question.correctAnswer),
-      Number(question.isJudgment)
+      Number(question.isJudgment), Number(question.isOpenText)
     );
     if (req.body.groupIds) surveyService.setQuestionGroups(result.lastInsertRowid, req.body.groupIds);
     res.status(201).json({ ...serializeQuestion(
@@ -149,7 +153,7 @@ function createAdminApi({ db, surveyService, config, app, updateService, onUpdat
   router.put('/questions/:id', (req, res) => {
     const question = surveyService.normalizeQuestion(req.body);
     const result = db.prepare(`
-      UPDATE question_pool SET title = ?, type = ?, options_json = ?, is_required = ?, correct_answer_json = ?, is_judgment = ?, updated_at = datetime('now')
+      UPDATE question_pool SET title = ?, type = ?, options_json = ?, is_required = ?, correct_answer_json = ?, is_judgment = ?, is_open_text = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       question.title,
@@ -157,7 +161,7 @@ function createAdminApi({ db, surveyService, config, app, updateService, onUpdat
       JSON.stringify(question.options),
       Number(question.required),
       question.correctAnswer === null ? null : JSON.stringify(question.correctAnswer),
-      Number(question.isJudgment),
+      Number(question.isJudgment), Number(question.isOpenText),
       req.params.id
     );
     if (!result.changes) throw new HttpError(404, '题目不存在');

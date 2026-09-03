@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Alert, Avatar, Button, Card, Checkbox, ColorPicker, Divider, Empty, Form, Input, Popover, Space, Tabs, Typography, Upload, App } from 'antd';
+import { Alert, Avatar, Button, Card, Checkbox, ColorPicker, Divider, Empty, Form, Input, Popover, Select, Space, Tabs, Typography, Upload, App } from 'antd';
 import { AppstoreOutlined, BgColorsOutlined, CloudDownloadOutlined, DeleteOutlined, LockOutlined, PictureOutlined, ReloadOutlined, SafetyCertificateOutlined, SettingOutlined, UndoOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { api } from '../../api';
 import { DEFAULT_SITE_ICON, emojiSiteIconUrl } from '../../lib/siteIcon';
 import SiteMark from '../../components/SiteMark';
+import {
+  DEFAULT_FOOTER_COPYRIGHT,
+  DEFAULT_FOOTER_PROGRAM,
+  PROGRAM_FOOTER_PRESETS,
+} from '../../lib/footer';
 
 const { Title, Text, Paragraph } = Typography;
 const DEFAULT_SITE_SETTINGS = {
@@ -15,7 +20,11 @@ const DEFAULT_SITE_SETTINGS = {
   siteInitial: 'Q',
   siteInitialColor: '#0D9488',
 };
-const DEFAULT_PERSONALIZATION_SETTINGS = { themeColor: '#0D9488' };
+const DEFAULT_PERSONALIZATION_SETTINGS = {
+  themeColor: '#0D9488',
+  footerCopyright: DEFAULT_FOOTER_COPYRIGHT,
+  footerProgram: DEFAULT_FOOTER_PROGRAM,
+};
 
 function siteCharacters(value) {
   return Array.from(String(value || '').trim() || 'Questra');
@@ -101,7 +110,7 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
   const confirmRestorePersonalization = () => {
     modal.confirm({
       title: '确认恢复个性化默认设置？',
-      content: '站点名称、图标、标识字符、标识背景色和主题色将恢复为默认值。此操作会立即保存。',
+      content: '站点名称、图标、标识字符、标识背景色、主题色和页脚版权将恢复为默认值。此操作会立即保存。',
       okText: '确认恢复',
       cancelText: '取消',
       okButtonProps: { danger: true },
@@ -180,7 +189,7 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
       <Title level={4}>站点设置</Title><Paragraph type="secondary">此处可更改站点内部分系统性设置。</Paragraph>
     </div> },
     { key: 'personalization', label: <Space><BgColorsOutlined />个性化</Space>, children: <Form form={personalizationForm} layout="vertical" onFinish={savePersonalization} style={{ maxWidth: 720 }}>
-      <Title level={4}>个性化</Title><Paragraph type="secondary">此处可调整站点外观、标识和界面主题。</Paragraph>
+      <Title level={4}>外观</Title><Paragraph type="secondary">此处可调整站点外观和界面主题。</Paragraph>
       <Form.Item name="siteName" label="站点名称"><Input maxLength={80} placeholder="Questra" /></Form.Item>
       <Form.Item name="siteIcon" label="站点图标"><Input prefix={<PictureOutlined />} placeholder="支持填入图片 URL、站内路径，也可上传图片或使用 Emoji" /></Form.Item>
       <div style={{ marginBottom: 24 }}><Space align="start"><Avatar shape="square" size={48} style={{ background: 'transparent', fontSize: 30 }} src={siteIcon || undefined}>{!siteIcon && DEFAULT_SITE_ICON}</Avatar><Upload accept="image/*" showUploadList={false} beforeUpload={readIcon}><Space direction="vertical" size={0}><Button icon={<UploadOutlined />}>上传图片</Button><Text type="secondary" className="upload-help">最大 1 MB</Text></Space></Upload><Popover open={emojiOpen} onOpenChange={setEmojiOpen} trigger="click" placement="bottomLeft" arrow={false} content={<div className="emoji-picker"><Space.Compact block><Input value={emojiInput} onChange={(event) => setEmojiInput(event.target.value)} onPressEnter={() => selectEmoji(emojiInput)} placeholder="输入或粘贴任意 Emoji" /><Button type="primary" disabled={!emojiInput.trim()} onClick={() => selectEmoji(emojiInput)}>使用</Button></Space.Compact><EmojiPicker width="100%" height={360} autoFocusSearch={false} lazyLoadEmojis searchPlaceHolder="搜索 Emoji" previewConfig={{ showPreview: false }} theme={resolvedTheme === 'dark' ? EmojiTheme.DARK : EmojiTheme.LIGHT} onEmojiClick={({ emoji }) => selectEmoji(emoji)} /></div>}><Button>使用 Emoji</Button></Popover><Button icon={<DeleteOutlined />} disabled={!siteIcon} onClick={() => personalizationForm.setFieldValue('siteIcon', '')}>清空图片</Button></Space></div>
@@ -195,10 +204,18 @@ export default function Settings({ onLogout, onRefresh, resolvedTheme }) {
           <Checkbox>使用站点图标</Checkbox>
         </Form.Item>
         <Space direction="vertical" align="center" size={4} className="site-identity-preview"><SiteMark size={40} siteName={siteName} siteInitial={siteInitial} siteInitialColor={siteInitialColor} siteIcon={siteIcon} siteIconAsInitial={siteIconAsInitial} /><Text type="secondary">预览</Text></Space>
+        <Form.Item name="themeColor" label="主题色" className="site-theme-color-item" extra="按钮等高亮元素的配色。">
+          <ColorPicker format={themeColorFormat} onFormatChange={(format) => setThemeColorFormat(format || 'rgb')} showText value={themeColor} onChange={setColor(personalizationForm, 'themeColor')} />
+        </Form.Item>
       </div>
       <Divider />
-      <Form.Item name="themeColor" label="主题色" extra="按钮等高亮元素的配色。">
-        <ColorPicker format={themeColorFormat} onFormatChange={(format) => setThemeColorFormat(format || 'rgb')} showText value={themeColor} onChange={setColor(personalizationForm, 'themeColor')} />
+      <Title level={4}>页脚版权</Title>
+      <Paragraph type="secondary">位于页脚左右两侧的版权信息。</Paragraph>
+      <Form.Item name="footerCopyright" label="版权文字" rules={[{ max: 300, message: '版权文字不能超过 300 个字符' }]} extra="版权文字可留空，同时支持使用 {year} 和 {siteName} 两种占位符显示相关信息。">
+        <Input.TextArea rows={3} maxLength={300} showCount allowClear placeholder={DEFAULT_FOOTER_COPYRIGHT} />
+      </Form.Item>
+      <Form.Item name="footerProgram" label="程序版权信息" extra="程序版权只可使用预设方案。">
+        <Select options={PROGRAM_FOOTER_PRESETS.map(({ value, label }) => ({ value, label }))} />
       </Form.Item>
       <Space><Button type="primary" htmlType="submit" loading={saving}>保存个性化设置</Button><Button danger icon={<UndoOutlined />} disabled={saving} onClick={confirmRestorePersonalization}>恢复默认设置</Button></Space>
     </Form> },

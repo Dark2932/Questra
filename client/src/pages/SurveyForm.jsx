@@ -50,11 +50,11 @@ export default function SurveyForm({ survey, onSubmit }) {
             <div>
               <Text strong style={{ display: 'block', lineHeight: 1.6 }}>{q.title}
                 {q.required && <Text type="danger" style={{ fontSize: 12, fontWeight: 400, marginLeft: 6 }}>必填</Text>}
-                {survey.kind === 'exam' && q.points != null && <Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>{q.points.toFixed(2).replace(/\.00$/, '')} 分</Text>}
+                {survey.kind === 'exam' && q.type !== 'open_text' && q.points != null && <Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>{q.points.toFixed(2).replace(/\.00$/, '')} 分</Text>}
               </Text>
             </div>
           </div>
-          {q.type === 'text' ? (
+          {(q.type === 'text' || q.type === 'open_text') ? (
             <TextArea rows={3} maxLength={10000} placeholder="请输入你的回答" value={answers[q.id] || ''}
               onChange={(e) => setAnswer(q.id, e.target.value)} style={{ marginLeft: 24 }} />
           ) : q.type === 'single' ? (

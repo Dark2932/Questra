@@ -20,6 +20,25 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; }
+.admin-body, .survey-body, .center-page { display: flex; flex-direction: column; }
+.admin-main, .survey-shell { flex: 1; }
+.site-footer {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 18px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+footer.site-footer a { color: #1677ff; }
+footer.site-footer a:hover { color: #4096ff; text-decoration: underline; }
+.survey-body[data-theme="dark"] footer.site-footer a { color: #4096ff; }
+.survey-body[data-theme="dark"] footer.site-footer a:hover { color: #69b1ff; }
+.site-footer-program { white-space: nowrap; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; letter-spacing: 0; }
 button, a { -webkit-tap-highlight-color: transparent; }
@@ -195,7 +214,8 @@ dialog legend { margin-bottom: 9px; }
 .survey-body[data-theme="dark"] input[type="text"], .survey-body[data-theme="dark"] input[type="datetime-local"], .survey-body[data-theme="dark"] input:not([type]), .survey-body[data-theme="dark"] select, .survey-body[data-theme="dark"] textarea { background: #2c2c2e; color: var(--ink); border-color: var(--line); }
 .survey-body[data-theme="dark"] .option-row:hover { background: #2c2c2e; }
 
-.center-page { display: grid; place-items: center; background: var(--canvas); padding: 24px; }
+.center-page { align-items: stretch; background: var(--canvas); padding: 24px; }
+.center-page > main { margin: auto; }
 .message-box { width: min(520px, 100%); padding: 48px; border: 1px solid var(--line); background: white; text-align: center; }
 .message-box h1 { margin: 20px 0 10px; font-size: 24px; }
 .message-box p { color: var(--muted); line-height: 1.7; margin: 0; }
@@ -204,6 +224,7 @@ dialog legend { margin-bottom: 9px; }
 .error-code { display: block; color: var(--accent); font-size: 52px; }
 
 @media (max-width: 720px) {
+  .site-footer { width: min(100% - 28px, 1180px); align-items: center; flex-direction: column; gap: 4px; text-align: center; }
   .admin-header { height: auto; min-height: 60px; padding: 0 16px; align-items: stretch; }
   .brand span:last-child { display: none; }
   .admin-header nav { gap: 16px; }

@@ -4,6 +4,9 @@ const { HttpError } = require('./lib/http');
 
 const DEFAULT_INITIAL_COLOR = '#0D9488';
 const DEFAULT_THEME_COLOR = '#0D9488';
+const DEFAULT_FOOTER_COPYRIGHT = 'Copyright © {year} {siteName}. All rights reserved.';
+const DEFAULT_FOOTER_PROGRAM = 'powered_by';
+const FOOTER_PROGRAM_PRESETS = new Set(['powered_by', 'built_with', 'open_source']);
 const DEFAULT_SITE_ICON_URL = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><text x="32" y="48" text-anchor="middle" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif" font-size="48">📜</text></svg>')}`;
 const SETTING_KEYS = {
   siteName: 'site_name',
@@ -11,7 +14,9 @@ const SETTING_KEYS = {
   siteIconAsInitial: 'site_icon_as_initial',
   siteInitial: 'site_initial',
   siteInitialColor: 'site_initial_color',
-  themeColor: 'theme_color'
+  themeColor: 'theme_color',
+  footerCopyright: 'footer_copyright',
+  footerProgram: 'footer_program'
 };
 
 function getSetting(db, key, fallback = '') {
@@ -74,6 +79,18 @@ function normalizeColor(value, fallback, label) {
   return color;
 }
 
+function normalizeFooterCopyright(value) {
+  const copyright = String(value || '').trim();
+  if (copyright.length > 300) throw new HttpError(400, '版权文字不能超过 300 个字符');
+  return copyright;
+}
+
+function normalizeFooterProgram(value) {
+  const preset = String(value || DEFAULT_FOOTER_PROGRAM).trim();
+  if (!FOOTER_PROGRAM_PRESETS.has(preset)) throw new HttpError(400, '程序版权预设无效');
+  return preset;
+}
+
 function getSiteSettings(db, fallbackName = 'Questra') {
   const siteName = getSetting(db, SETTING_KEYS.siteName, fallbackName || 'Questra') || 'Questra';
   return {
@@ -82,7 +99,9 @@ function getSiteSettings(db, fallbackName = 'Questra') {
     siteIconAsInitial: normalizeSiteIconAsInitial(getSetting(db, SETTING_KEYS.siteIconAsInitial, '0')),
     siteInitial: normalizeSiteInitial(getSetting(db, SETTING_KEYS.siteInitial, ''), siteName),
     siteInitialColor: normalizeColor(getSetting(db, SETTING_KEYS.siteInitialColor, DEFAULT_INITIAL_COLOR), DEFAULT_INITIAL_COLOR, '标识背景色'),
-    themeColor: normalizeColor(getSetting(db, SETTING_KEYS.themeColor, DEFAULT_THEME_COLOR), DEFAULT_THEME_COLOR, '主题色')
+    themeColor: normalizeColor(getSetting(db, SETTING_KEYS.themeColor, DEFAULT_THEME_COLOR), DEFAULT_THEME_COLOR, '主题色'),
+    footerCopyright: normalizeFooterCopyright(getSetting(db, SETTING_KEYS.footerCopyright, DEFAULT_FOOTER_COPYRIGHT)),
+    footerProgram: normalizeFooterProgram(getSetting(db, SETTING_KEYS.footerProgram, DEFAULT_FOOTER_PROGRAM))
   };
 }
 
@@ -95,18 +114,24 @@ function updateSiteSettings(db, input = {}) {
   const siteInitial = normalizeSiteInitial(value('siteInitial'), siteName);
   const siteInitialColor = normalizeColor(value('siteInitialColor'), DEFAULT_INITIAL_COLOR, '标识背景色');
   const themeColor = normalizeColor(value('themeColor'), DEFAULT_THEME_COLOR, '主题色');
+  const footerCopyright = normalizeFooterCopyright(value('footerCopyright'));
+  const footerProgram = normalizeFooterProgram(value('footerProgram'));
   setSetting(db, SETTING_KEYS.siteName, siteName);
   setSetting(db, SETTING_KEYS.siteIcon, siteIcon);
   setSetting(db, SETTING_KEYS.siteIconAsInitial, siteIconAsInitial ? '1' : '0');
   setSetting(db, SETTING_KEYS.siteInitial, siteInitial);
   setSetting(db, SETTING_KEYS.siteInitialColor, siteInitialColor);
   setSetting(db, SETTING_KEYS.themeColor, themeColor);
-  return { siteName, siteIcon: siteIcon || '', siteIconAsInitial, siteInitial, siteInitialColor, themeColor };
+  setSetting(db, SETTING_KEYS.footerCopyright, footerCopyright);
+  setSetting(db, SETTING_KEYS.footerProgram, footerProgram);
+  return { siteName, siteIcon: siteIcon || '', siteIconAsInitial, siteInitial, siteInitialColor, themeColor, footerCopyright, footerProgram };
 }
 
 module.exports = {
   DEFAULT_INITIAL_COLOR,
   DEFAULT_THEME_COLOR,
+  DEFAULT_FOOTER_COPYRIGHT,
+  DEFAULT_FOOTER_PROGRAM,
   DEFAULT_SITE_ICON_URL,
   getSetting,
   setSetting,
@@ -115,5 +140,7 @@ module.exports = {
   normalizeSiteName,
   normalizeSiteIcon,
   normalizeSiteInitial,
-  normalizeColor
+  normalizeColor,
+  normalizeFooterCopyright,
+  normalizeFooterProgram
 };

@@ -54,19 +54,21 @@ async function initQuestions() {
 
   function renderCorrectChoices(selected = null) {
     const oldSelected = selected || [...correctChoiceOptions.querySelectorAll('input:checked')].map((input) => input.value);
-    const options = form.elements.options.value.split('\n').map((value) => value.trim()).filter(Boolean);
     const type = form.elements.type.value;
+    const options = type === 'judgment' ? ['正确', '错误'] : form.elements.options.value.split('\n').map((value) => value.trim()).filter(Boolean);
     correctChoiceOptions.innerHTML = options.length ? options.map((option) => `
       <label class="check-row"><input type="${type === 'single' ? 'radio' : 'checkbox'}" name="correctChoice" value="${escapeAttribute(option)}" ${oldSelected.includes(option) ? 'checked' : ''}><span>${escapeHtml(option)}</span></label>
     `).join('') : '<p class="empty-note">请先填写选项。</p>';
   }
 
   function updateType(selected = null) {
-    const isText = form.elements.type.value === 'text';
-    optionsField.hidden = isText;
-    correctChoiceField.hidden = isText;
-    correctTextField.hidden = !isText;
-    if (!isText) renderCorrectChoices(selected);
+    const type = form.elements.type.value;
+    const isFill = type === 'text';
+    const isOpenText = type === 'open_text';
+    optionsField.hidden = isFill || isOpenText || type === 'judgment';
+    correctTextField.hidden = !isFill;
+    if (!isFill && !isOpenText) renderCorrectChoices(selected);
+    correctChoiceField.hidden = isFill || isOpenText || !correctChoiceOptions.querySelector('input');
   }
 
   function render() {
@@ -74,10 +76,10 @@ async function initQuestions() {
       list.innerHTML = '<div class="empty-state"><strong>题库还是空的</strong><span>添加第一道题目后即可生成问卷。</span></div>';
       return;
     }
-    const labels = { single: '单选', multiple: '多选', text: '文本' };
+    const labels = { single: '单选', multiple: '多选', judgment: '判断', text: '填空', open_text: '开放文本' };
     list.innerHTML = questions.map((question) => `
       <article class="list-row">
-        <div class="list-content"><div class="list-meta"><span class="type-tag">${labels[question.type]}</span>${question.required ? '<span>必填</span>' : '<span>选填</span>'}${question.correctAnswer === null ? '<span class="answer-missing">未设答案</span>' : '<span class="answer-ready">已设答案</span>'}</div><strong>${escapeHtml(question.title)}</strong>${question.options.length ? `<p>${question.options.map(escapeHtml).join(' / ')}</p>` : ''}${question.correctAnswer !== null ? `<p class="correct-answer-text">标准答案：${escapeHtml(Array.isArray(question.correctAnswer) ? question.correctAnswer.join('、') : question.correctAnswer)}</p>` : ''}</div>
+        <div class="list-content"><div class="list-meta"><span class="type-tag">${labels[question.type]}</span>${question.type === 'open_text' ? '<span>无需标准答案</span>' : (question.correctAnswer === null ? '<span class="answer-missing">未设答案</span>' : '<span class="answer-ready">已设答案</span>')}</div><strong>${escapeHtml(question.title)}</strong>${question.options.length ? `<p>${question.options.map(escapeHtml).join(' / ')}</p>` : ''}${question.correctAnswer !== null ? `<p class="correct-answer-text">标准答案：${escapeHtml(Array.isArray(question.correctAnswer) ? question.correctAnswer.join('、') : question.correctAnswer)}</p>` : ''}</div>
         <div class="row-actions"><button class="button small" data-edit="${question.id}">编辑</button><button class="button small danger" data-delete="${question.id}">删除</button></div>
       </article>`).join('');
   }
@@ -96,7 +98,7 @@ async function initQuestions() {
     dialog.showModal();
   });
   form.elements.type.addEventListener('change', () => updateType([]));
-  form.elements.options.addEventListener('input', () => renderCorrectChoices());
+  form.elements.options.addEventListener('input', () => updateType());
 
   list.addEventListener('click', async (event) => {
     const editId = Number(event.target.dataset.edit);
@@ -108,7 +110,6 @@ async function initQuestions() {
       form.elements.type.value = question.type;
       form.elements.options.value = question.options.join('\n');
       form.elements.correctText.value = question.type === 'text' && Array.isArray(question.correctAnswer) ? question.correctAnswer.join('\n') : '';
-      form.elements.required.checked = question.required;
       document.querySelector('#question-form-title').textContent = '编辑题目';
       errorNode.textContent = '';
       const selected = question.correctAnswer === null
@@ -130,14 +131,14 @@ async function initQuestions() {
     event.preventDefault();
     const id = form.elements.id.value;
     const selectedAnswers = [...form.querySelectorAll('[name="correctChoice"]:checked')].map((input) => input.value);
-    const correctAnswer = form.elements.type.value === 'text'
+    const correctAnswer = form.elements.type.value === 'open_text' ? null : form.elements.type.value === 'text'
       ? form.elements.correctText.value.split('\n').map((value) => value.trim()).filter(Boolean)
       : (form.elements.type.value === 'single' ? (selectedAnswers[0] || null) : selectedAnswers);
     const payload = {
       title: form.elements.title.value,
       type: form.elements.type.value,
       options: form.elements.options.value.split('\n'),
-      required: form.elements.required.checked,
+      required: false,
       correctAnswer: Array.isArray(correctAnswer) && !correctAnswer.length ? null : correctAnswer
     };
     errorNode.textContent = '';
@@ -162,7 +163,7 @@ async function initSurveys() {
   let surveys = [];
   let questions = [];
   bindDialogClose(dialog);
-  const typeLabels = { single: '单选', multiple: '多选', text: '文本' };
+  const typeLabels = { single: '单选', multiple: '多选', judgment: '判断', text: '填空', open_text: '开放文本' };
 
   function render() {
     if (!surveys.length) {
@@ -176,7 +177,8 @@ async function initSurveys() {
   function renderChoices() {
     choices.innerHTML = questions.length ? questions.map((question) => `
       <div class="choice-item scored-choice" data-question-type="${question.type}">
-        <label class="check-row"><input type="checkbox" name="questionIds" value="${question.id}"><span><strong>${escapeHtml(question.title)}</strong><small>${typeLabels[question.type]} · ${question.required ? '必填' : '选填'} · ${question.correctAnswer === null ? '<b class="answer-missing">未设答案</b>' : '<b class="answer-ready">已设答案</b>'}</small></span></label>
+        <label class="check-row"><input type="checkbox" name="questionIds" value="${question.id}"><span><strong>${escapeHtml(question.title)}</strong><small>${typeLabels[question.type]} · ${question.type === 'open_text' ? '无需标准答案' : (question.correctAnswer === null ? '<b class="answer-missing">未设答案</b>' : '<b class="answer-ready">已设答案</b>')}</small></span></label>
+        <label class="check-row question-required" hidden><input type="checkbox" data-question-required="${question.id}" checked><span>必填</span></label>
         <label class="question-score" hidden><input type="number" min="0.01" step="0.01" data-question-score="${question.id}" placeholder="分值"><span>分</span></label>
       </div>`).join('') : '<p class="empty-note">题库为空，请先添加题目。</p>';
   }
@@ -195,7 +197,7 @@ async function initSurveys() {
 
   function renderWeights() {
     const weights = document.querySelector('#weight-fields');
-    const types = [...new Set(selectedQuestions().map((question) => question.type))];
+    const types = [...new Set(selectedQuestions().filter((question) => question.type !== 'open_text').map((question) => question.type))];
     const previous = Object.fromEntries([...weights.querySelectorAll('[data-weight-type]')]
       .map((input) => [input.dataset.weightType, input.value]));
     const sameTypes = types.length === Object.keys(previous).length && types.every((type) => previous[type] !== undefined);
@@ -214,7 +216,7 @@ async function initSurveys() {
     document.querySelector('#exam-settings').hidden = !isExam;
     document.querySelector('#weighted-settings').hidden = !isExam || mode !== 'weighted';
     document.querySelector('#per-question-settings').hidden = !isExam || mode !== 'per_question';
-    form.querySelectorAll('.question-score').forEach((field) => { field.hidden = !isExam || mode !== 'per_question'; });
+    form.querySelectorAll('.question-score').forEach((field) => { field.hidden = !isExam || mode !== 'per_question' || field.closest('.scored-choice').dataset.questionType === 'open_text'; });
     if (isExam && mode === 'weighted') renderWeights();
     updateMaxScore();
   }
@@ -236,7 +238,10 @@ async function initSurveys() {
   form.elements.kind.addEventListener('change', updateExamSettings);
   form.querySelectorAll('[name="scoringMode"]').forEach((input) => input.addEventListener('change', updateExamSettings));
   choices.addEventListener('change', (event) => {
-    if (event.target.matches('[name="questionIds"]')) renderWeights();
+    if (event.target.matches('[name="questionIds"]')) {
+      event.target.closest('.scored-choice').querySelector('.question-required').hidden = !event.target.checked;
+      renderWeights();
+    }
     updateMaxScore();
   });
   choices.addEventListener('input', updateMaxScore);
@@ -277,6 +282,7 @@ async function initSurveys() {
     const expiresAt = form.elements.expiresAt.value;
     const typeWeights = Object.fromEntries([...form.querySelectorAll('[data-weight-type]')].map((input) => [input.dataset.weightType, Number(input.value)]));
     const questionScores = Object.fromEntries([...form.querySelectorAll('[data-question-score]')].map((input) => [input.dataset.questionScore, Number(input.value)]));
+    const questionRequired = Object.fromEntries([...form.querySelectorAll('[data-question-required]')].map((input) => [input.dataset.questionRequired, input.checked]));
     errorNode.textContent = '';
     try {
       await api('/surveys', { method: 'POST', body: JSON.stringify({
@@ -285,6 +291,7 @@ async function initSurveys() {
         description: form.elements.description.value,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         questionIds,
+        questionRequired,
         scoringMode: form.elements.scoringMode.value,
         totalScore: Number(form.elements.totalScore.value),
         typeWeights,

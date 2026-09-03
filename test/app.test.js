@@ -194,6 +194,81 @@ test('考试权重计分、答案保密和逐题分值模式', async (t) => {
   assert.deepEqual(perQuestionExam.questions.map((question) => question.points), [5, 15]);
 });
 
+test('开放文本、题型虚拟分组和实例级必填保持一致', async (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-question-types-'));
+  const db = openDatabase(path.join(tempDir, 'test.db'));
+  migrate(db);
+  const app = createApp({ db, adminToken: 'types-token', config: { siteName: 'Test', hooks: {} } });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const headers = { authorization: 'Bearer types-token', 'content-type': 'application/json' };
+  t.after(() => {
+    server.close();
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  async function addQuestion(payload) {
+    const response = await fetch(`${baseUrl}/api/admin/questions`, { method: 'POST', headers, body: JSON.stringify(payload) });
+    assert.equal(response.status, 201);
+    return response.json();
+  }
+
+  const fill = await addQuestion({ title: '运行时名称', type: 'text', correctAnswer: ['Node.js'] });
+  const openText = await addQuestion({ title: '改进建议', type: 'open_text', correctAnswer: ['不应保存'] });
+  const single = await addQuestion({ title: '选择版本', type: 'single', options: ['22', '24'], correctAnswer: '22' });
+  assert.equal(fill.type, 'text');
+  assert.deepEqual(fill.correctAnswer, ['Node.js']);
+  assert.equal(openText.type, 'open_text');
+  assert.equal(openText.correctAnswer, null);
+
+  const groups = await (await fetch(`${baseUrl}/api/admin/groups`, { headers })).json();
+  assert.equal(groups.find((group) => group.id === 'type:text').questionCount, 1);
+  assert.equal(groups.find((group) => group.id === 'type:open_text').questionCount, 1);
+
+  const surveyResponse = await fetch(`${baseUrl}/api/admin/surveys`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ title: '实例级必填', questionIds: [fill.id, openText.id], questionRequired: { [fill.id]: false, [openText.id]: true } })
+  });
+  assert.equal(surveyResponse.status, 201);
+  const survey = await surveyResponse.json();
+  assert.deepEqual(survey.questions.map((question) => [question.type, question.required]), [['text', false], ['open_text', true]]);
+
+  const missingRequired = await fetch(`${baseUrl}/api/surveys/${survey.id}/responses`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ answers: { [survey.questions[0].id]: '' } })
+  });
+  assert.equal(missingRequired.status, 400);
+
+  const examResponse = await fetch(`${baseUrl}/api/admin/surveys`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      kind: 'exam', title: '含开放文本的考试', questionIds: [fill.id, openText.id],
+      scoringMode: 'weighted', totalScore: 10, typeWeights: { text: 100 }
+    })
+  });
+  assert.equal(examResponse.status, 201);
+  const exam = await examResponse.json();
+  assert.equal(exam.maxScore, 10);
+  assert.deepEqual(exam.questions.map((question) => question.points), [10, 0]);
+
+  const result = await fetch(`${baseUrl}/api/surveys/${exam.id}/responses`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ answers: { [exam.questions[0].id]: 'node.js', [exam.questions[1].id]: '自由回答' } })
+  });
+  assert.equal(result.status, 201);
+  assert.equal((await result.json()).score, 10);
+
+  const randomResponse = await fetch(`${baseUrl}/api/admin/surveys`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ title: '按题型抽题', selectionMode: 'random', sourceGroupId: 'type:single', randomCounts: { single: 1 }, questionRequired: { [single.id]: true } })
+  });
+  assert.equal(randomResponse.status, 201);
+  const randomSurvey = await randomResponse.json();
+  assert.equal(randomSurvey.sourceGroupId, 'type:single');
+  assert.equal(randomSurvey.questions[0].type, 'single');
+  assert.equal(randomSurvey.questions[0].required, true);
+});
+
 test('Admin Token 持久化：重启复用、环境变量优先', async (t) => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'questra-token-'));
   const databasePath = path.join(tempDir, 'data', 'questra.db');

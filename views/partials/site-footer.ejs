@@ -1,0 +1,16 @@
+<%
+  const DEFAULT_COPYRIGHT = 'Copyright © {year} {siteName}. All rights reserved.';
+  const resolvedFooterCopyright = String(footerCopyright || '').trim();
+  const footerParts = resolvedFooterCopyright.split(/(\{\{?\s*(?:year|siteName)\s*\}?\})/gi).filter(Boolean);
+  const resolvedFooterProgram = ['powered_by', 'built_with', 'open_source'].includes(footerProgram) ? footerProgram : 'powered_by';
+%>
+<footer class="site-footer">
+  <span class="site-footer-copyright">
+    <% if (!resolvedFooterCopyright) { %><% } else if (resolvedFooterCopyright === DEFAULT_COPYRIGHT) { %>
+      <strong>Copyright © <%= new Date().getFullYear() %> <a href="/"><%= siteName || 'Questra' %></a>.</strong> All rights reserved.
+    <% } else { footerParts.forEach((part) => { const placeholder = part.replace(/[{}]/g, '').trim().toLowerCase(); %>
+      <% if (placeholder === 'year') { %><%= new Date().getFullYear() %><% } else if (placeholder === 'sitename') { %><a href="/"><%= siteName || 'Questra' %></a><% } else { %><%= part %><% } %>
+    <% }) } %>
+  </span>
+  <span class="site-footer-program"><%= resolvedFooterProgram === 'built_with' ? 'Built with ' : resolvedFooterProgram === 'open_source' ? '基于 ' : 'Powered by ' %><a href="https://github.com/Dark2932/Questra" target="_blank" rel="noreferrer">Questra</a><%= resolvedFooterProgram === 'open_source' ? ' 开源构建' : '' %></span>
+</footer>

@@ -50,7 +50,7 @@ migrations/             只增不改的数据库迁移
 views/、public/         无 React 构建时的兼容界面与静态资源
 ```
 
-业务规则应放在 service，HTTP 参数转换和状态码应放在 route，避免在路由或前端复制判分逻辑。修改 API 时同时检查客户端调用、错误处理和 `docs/api.md`。
+业务规则应放在 service，HTTP 参数转换和状态码应放在 route，避免在路由或前端复制判分逻辑。修改 API 时同时检查客户端调用、错误处理和 `docs/api.md`。站点外观与页脚配置复用 `app_settings` 键值表；React 与 EJS 兼容页都必须将版权模板作为纯文本渲染，并保持相同的占位符和受控程序版权预设。
 
 ## 扩展钩子
 
@@ -82,7 +82,7 @@ module.exports = {
 
 ## 数据库和迁移
 
-当前核心表包括 `question_pool`、`question_groups`、`question_group_items`、`surveys`、`survey_questions`、`responses` 和 `answers`，管理员认证使用 `admin_accounts`、`admin_sessions`、`app_settings`。`survey_questions.is_active` 区分当前题目结构与仍被历史答卷引用的旧快照；结构编辑不得删除历史答卷。已有迁移不能修改；新增结构使用下一个编号，并同时覆盖空库和已有库升级测试。考虑 WAL、外键级联、备份恢复和历史快照兼容。
+当前核心表包括 `question_pool`、`question_groups`、`question_group_items`、`surveys`、`survey_questions`、`responses` 和 `answers`，管理员认证使用 `admin_accounts`、`admin_sessions`、`app_settings`。`survey_questions.is_active` 区分当前题目结构与仍被历史答卷引用的旧快照；`question_pool.is_open_text` 与 `survey_questions.is_open_text` 在不重建旧表 CHECK 约束的前提下区分填空和开放文本。结构编辑不得删除历史答卷。已有迁移不能修改；新增结构使用下一个编号，并同时覆盖空库和已有库升级测试。考虑 WAL、外键级联、备份恢复和历史快照兼容。
 
 迁移 `006_user_auth_and_access.sql` 新增 `users`、`user_sessions`、`user_auth_tokens`、`survey_access_policies`，并为 `responses` 增加可空 `user_id`。新资源若复用参与限制，应先调用 `access-policy` 服务并保持授权检查与资源写入处于同一事务；不能信任客户端传入的用户 ID、邮箱或剩余次数。
 

@@ -60,6 +60,10 @@ function toIsoTimestamp(value) {
   return `${String(value).replace(' ', 'T')}Z`;
 }
 
+function sqliteTimestamp(date) {
+  return date.toISOString().replace('T', ' ').slice(0, 19);
+}
+
 function getDashboardData(db, query = {}, options = {}) {
   const now = options.now || new Date();
   const range = dateRange(query, now);
@@ -110,9 +114,11 @@ function getDashboardData(db, query = {}, options = {}) {
 
   const recentResponses = db.prepare(`
     SELECT r.id, r.submitted_at, r.score, r.max_score,
-      s.id AS survey_id, s.title AS survey_title, s.kind
+      s.id AS survey_id, s.title AS survey_title, s.kind,
+      u.display_name
     FROM responses r
     JOIN surveys s ON s.id = r.survey_id
+    LEFT JOIN users u ON u.id = r.user_id
     ORDER BY datetime(r.submitted_at) DESC, r.rowid DESC
     LIMIT ?
   `).all(RECENT_RESPONSE_LIMIT).map((row) => ({
@@ -121,6 +127,7 @@ function getDashboardData(db, query = {}, options = {}) {
     surveyId: row.survey_id,
     surveyTitle: row.survey_title,
     kind: row.kind,
+    participant: row.display_name ? { displayName: row.display_name } : null,
     score: row.score === null ? null : Number(row.score),
     maxScore: row.max_score === null ? null : Number(row.max_score),
     status: row.score === null ? 'submitted' : 'graded'
@@ -138,13 +145,65 @@ function getDashboardData(db, query = {}, options = {}) {
     averageExamScore7d
   };
 
+  const todayRow = db.prepare(`
+    SELECT
+      COUNT(*) AS response_count,
+      SUM(CASE WHEN s.kind = 'exam' THEN 1 ELSE 0 END) AS exam_count,
+      SUM(CASE WHEN s.kind = 'exam' AND r.score IS NOT NULL AND r.max_score > 0 THEN 1 ELSE 0 END) AS graded_exam_count,
+      SUM(CASE WHEN s.kind = 'exam' AND r.score IS NOT NULL AND r.max_score > 0 AND r.score * 100.0 / r.max_score >= 60 THEN 1 ELSE 0 END) AS passed_exam_count
+    FROM responses r JOIN surveys s ON s.id = r.survey_id
+    WHERE date(r.submitted_at) = date(?)
+  `).get(today);
+  const gradedExamCount = Number(todayRow.graded_exam_count || 0);
+  const todayOverview = {
+    responses: Number(todayRow.response_count || 0),
+    exams: Number(todayRow.exam_count || 0),
+    passRate: gradedExamCount ? Math.round(Number(todayRow.passed_exam_count || 0) * 1000 / gradedExamCount) / 10 : null
+  };
+
+  const highErrorQuestions = db.prepare(`
+    SELECT q.id, q.title, COUNT(a.id) AS attempts,
+      SUM(CASE WHEN a.is_correct = 0 THEN 1 ELSE 0 END) AS errors
+    FROM answers a
+    JOIN survey_questions q ON q.id = a.survey_question_id
+    WHERE a.is_correct IS NOT NULL
+    GROUP BY q.id, q.title
+    HAVING COUNT(a.id) >= 3
+      AND SUM(CASE WHEN a.is_correct = 0 THEN 1 ELSE 0 END) * 1.0 / COUNT(a.id) >= 0.5
+    ORDER BY errors * 1.0 / attempts DESC, attempts DESC, q.id
+    LIMIT 5
+  `).all().map((row) => ({
+    id: row.id,
+    title: row.title,
+    attempts: Number(row.attempts),
+    errorRate: Math.round(Number(row.errors || 0) * 1000 / Number(row.attempts || 1)) / 10
+  }));
+
+  const expiringSurveys = db.prepare(`
+    SELECT id, title, kind, expires_at
+    FROM surveys
+    WHERE status = 'active'
+      AND expires_at IS NOT NULL
+      AND datetime(expires_at) > datetime(?)
+      AND datetime(expires_at) <= datetime(?, '+7 day')
+    ORDER BY datetime(expires_at), title
+    LIMIT 5
+  `).all(sqliteTimestamp(now), sqliteTimestamp(now)).map((row) => ({
+    id: row.id,
+    title: row.title,
+    kind: row.kind,
+    expiresAt: toIsoTimestamp(row.expires_at)
+  }));
+
   return {
     totals,
     range: { type: range.type, startDate: range.startDate, endDate: range.endDate },
     trend: range.days.map((day) => ({ day, count: countsByDay.get(day) || 0 })),
     trendBySurvey,
     surveyTotals: [...surveyTotals.values()].sort((a, b) => b.count - a.count || a.surveyTitle.localeCompare(b.surveyTitle, 'zh-CN')),
-    recentResponses
+    recentResponses,
+    todayOverview,
+    alerts: { highErrorQuestions, expiringSurveys }
   };
 }
 

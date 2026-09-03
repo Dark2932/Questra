@@ -7,6 +7,7 @@ import { api } from './api';
 import { DEFAULT_SITE_ICON_URL } from './lib/siteIcon';
 import { formatPageTitle, pageNameForPath } from './lib/pageTitle';
 import { UserAuthProvider } from './hooks/useUserAuth';
+import PublicLayout from './components/layout/PublicLayout';
 
 const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
@@ -62,7 +63,7 @@ function useAdminAccess() {
 }
 
 function CenterLoading() {
-  return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><Spin size="large" /></div>;
+  return <div className="center-loading"><Spin size="large" /></div>;
 }
 
 function RouteTitle({ siteName }) {
@@ -87,8 +88,18 @@ function AnimatedRoutes({ access, theme, resolvedTheme, setTheme }) {
   return <Suspense fallback={<CenterLoading />}>
     <RouteTitle siteName={access.setup?.siteName} />
     <Routes>
-    <Route path="/admin/setup" element={access.loading ? <CenterLoading /> : access.setup?.initialized ? <Navigate to="/admin/login" replace /> : <SetupWizard onComplete={access.refresh} />} />
-    <Route path="/admin/login" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Login onLogin={access.refresh} siteName={access.setup?.siteName} siteInitial={access.setup?.siteInitial} siteInitialColor={access.setup?.siteInitialColor} siteIcon={access.setup?.siteIcon} siteIconAsInitial={access.setup?.siteIconAsInitial} />} />
+    <Route element={<PublicLayout site={access.setup} />}>
+      <Route path="/admin/setup" element={access.loading ? <CenterLoading /> : access.setup?.initialized ? <Navigate to="/admin/login" replace /> : <SetupWizard onComplete={access.refresh} />} />
+      <Route path="/admin/login" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Login onLogin={access.refresh} siteName={access.setup?.siteName} siteInitial={access.setup?.siteInitial} siteInitialColor={access.setup?.siteInitialColor} siteIcon={access.setup?.siteIcon} siteIconAsInitial={access.setup?.siteIconAsInitial} />} />
+      <Route path="/s/:id" element={<Survey siteName={access.setup?.siteName} />} />
+      <Route path="/user/login" element={<UserLogin />} />
+      <Route path="/user/register" element={<UserRegister />} />
+      <Route path="/user/verify" element={<UserVerify />} />
+      <Route path="/user/forgot-password" element={<UserForgotPassword />} />
+      <Route path="/user/reset-password" element={<UserResetPassword />} />
+      <Route path="/user/profile" element={<UserProfile />} />
+      <Route path="/unauthorized" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Unauthorized siteName={access.setup?.siteName} siteInitial={access.setup?.siteInitial} siteInitialColor={access.setup?.siteInitialColor} siteIcon={access.setup?.siteIcon} siteIconAsInitial={access.setup?.siteIconAsInitial} />} />
+    </Route>
     <Route path="/admin" element={<AdminGate access={access}><AdminLayout authenticated={access.authenticated} site={access.setup} user={access.user} onLogout={access.logout} theme={theme} resolvedTheme={resolvedTheme} onThemeChange={setTheme} /></AdminGate>}>
       <Route index element={<Dashboard />} />
       <Route path="questions" element={<Questions />} />
@@ -98,14 +109,6 @@ function AnimatedRoutes({ access, theme, resolvedTheme, setTheme }) {
       <Route path="plugins" element={<Plugins />} />
       <Route path="settings" element={<Settings onLogout={access.logout} onRefresh={access.refresh} resolvedTheme={resolvedTheme} />} />
     </Route>
-    <Route path="/s/:id" element={<Survey siteName={access.setup?.siteName} />} />
-    <Route path="/user/login" element={<UserLogin />} />
-    <Route path="/user/register" element={<UserRegister />} />
-    <Route path="/user/verify" element={<UserVerify />} />
-    <Route path="/user/forgot-password" element={<UserForgotPassword />} />
-    <Route path="/user/reset-password" element={<UserResetPassword />} />
-    <Route path="/user/profile" element={<UserProfile />} />
-    <Route path="/unauthorized" element={access.loading ? <CenterLoading /> : !access.setup?.initialized ? <Navigate to="/admin/setup" replace /> : access.authenticated ? <Navigate to="/admin" replace /> : <Unauthorized siteName={access.setup?.siteName} siteInitial={access.setup?.siteInitial} siteInitialColor={access.setup?.siteInitialColor} siteIcon={access.setup?.siteIcon} siteIconAsInitial={access.setup?.siteIconAsInitial} />} />
     <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>
   </Suspense>;

@@ -28,7 +28,11 @@ test('无前端构建产物时提供用户认证回退页面', async (t) => {
     const response = await fetch(`${baseUrl}${route}`);
     assert.equal(response.status, 200);
     assert.match(response.headers.get('content-type'), /text\/html/);
-    assert.match(await response.text(), /用户登录/);
+    const html = await response.text();
+    assert.match(html, /用户登录/);
+    assert.match(html, /Copyright ©/);
+    assert.match(html, /Powered by/);
+    assert.match(html, /github\.com\/Dark2932\/Questra/);
   }
 });
 
